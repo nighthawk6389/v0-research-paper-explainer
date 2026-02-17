@@ -12,32 +12,66 @@ export async function POST(req: Request) {
 
     // If URL provided, fetch the PDF
     if (url && !pdfBase64) {
-      const response = await fetch(url, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; PaperExplainer/1.0)",
-          Accept: "application/pdf",
-        },
-      })
+      try {
+        const response = await fetch(url, {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            Accept:
+              "application/pdf,application/octet-stream,*/*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            Referer: new URL(url).origin + "/",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "same-origin",
+          },
+          redirect: "follow",
+        })
 
-      if (!response.ok) {
+        if (!response.ok) {
+          const isAuthError = response.status === 403 || response.status === 401
+          const hint = isAuthError
+            ? " This publisher blocks automated downloads. Please download the PDF in your browser, then upload it here using the Upload button."
+            : ""
+          return Response.json(
+            {
+              error: `Failed to fetch PDF from URL (${response.status}).${hint}`,
+              fetchFailed: isAuthError,
+            },
+            { status: 400 }
+          )
+        }
+
+        const contentType = response.headers.get("content-type") || ""
+
+        // Handle arXiv and similar services that may redirect to HTML
+        if (
+          contentType.includes("text/html") &&
+          !contentType.includes("application/pdf")
+        ) {
+          return Response.json(
+            {
+              error:
+                "The URL returned an HTML page instead of a PDF. For arXiv papers, use the direct PDF link (e.g., https://arxiv.org/pdf/XXXX.XXXXX). For other publishers, download the PDF and upload it directly.",
+              fetchFailed: true,
+            },
+            { status: 400 }
+          )
+        }
+
+        const arrayBuffer = await response.arrayBuffer()
+        pdfData = Buffer.from(arrayBuffer).toString("base64")
+      } catch (fetchError) {
         return Response.json(
-          { error: `Failed to fetch PDF from URL: ${response.status} ${response.statusText}` },
+          {
+            error:
+              "Could not download the PDF from this URL. Please download it in your browser and upload the file directly.",
+            fetchFailed: true,
+          },
           { status: 400 }
         )
       }
-
-      const contentType = response.headers.get("content-type") || ""
-      
-      // Handle arXiv and similar services that may redirect to HTML
-      if (contentType.includes("text/html")) {
-        return Response.json(
-          { error: "The URL returned an HTML page instead of a PDF. For arXiv papers, use the direct PDF link (e.g., https://arxiv.org/pdf/XXXX.XXXXX)" },
-          { status: 400 }
-        )
-      }
-
-      const arrayBuffer = await response.arrayBuffer()
-      pdfData = Buffer.from(arrayBuffer).toString("base64")
     }
 
     if (!pdfData) {

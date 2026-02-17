@@ -8,9 +8,10 @@ import { Upload, Link, Loader2, FileText, X } from "lucide-react"
 interface PaperUploadBarProps {
   onAnalyze: (data: { pdfBase64?: string; url?: string; pdfBlob?: Blob }) => void
   isLoading: boolean
+  showUploadHint?: boolean
 }
 
-export function PaperUploadBar({ onAnalyze, isLoading }: PaperUploadBarProps) {
+export function PaperUploadBar({ onAnalyze, isLoading, showUploadHint }: PaperUploadBarProps) {
   const [url, setUrl] = useState("")
   const [fileName, setFileName] = useState<string | null>(null)
   const [pdfBase64, setPdfBase64] = useState<string | null>(null)
@@ -121,7 +122,7 @@ export function PaperUploadBar({ onAnalyze, isLoading }: PaperUploadBarProps) {
             size="sm"
             onClick={() => fileInputRef.current?.click()}
             disabled={isLoading}
-            className="shrink-0"
+            className={`shrink-0 ${showUploadHint ? "ring-2 ring-primary ring-offset-2 animate-pulse" : ""}`}
           >
             <Upload className="size-4" />
             <span className="hidden sm:inline">Upload</span>

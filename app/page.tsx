@@ -24,6 +24,7 @@ export default function Home() {
   const [selectedSection, setSelectedSection] = useState<Section | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showUploadHint, setShowUploadHint] = useState(false)
 
   // Compute highlighted page from hovered section
   const highlightedPage = useMemo(() => {
@@ -37,6 +38,7 @@ export default function Home() {
       setIsLoading(true)
       setError(null)
       setPaper(null)
+      setShowUploadHint(false)
 
       // Store PDF data for the viewer
       if (data.pdfBase64) {
@@ -60,7 +62,19 @@ export default function Home() {
         const result = await response.json()
 
         if (!response.ok) {
-          throw new Error(result.error || "Failed to parse paper")
+          // If the server couldn't fetch the URL, show a helpful message
+          if (result.fetchFailed) {
+            setError(null)
+            setShowUploadHint(true)
+            toast.error("Could not download from this URL", {
+              description:
+                "This publisher blocks automated downloads. Please download the PDF in your browser and use the Upload button instead.",
+              duration: 8000,
+            })
+          } else {
+            throw new Error(result.error || "Failed to parse paper")
+          }
+          return
         }
 
         setPaper(result.paper)
@@ -96,7 +110,7 @@ export default function Home() {
     <div className="flex flex-col h-dvh overflow-hidden">
       <Toaster position="top-right" />
 
-      <PaperUploadBar onAnalyze={handleAnalyze} isLoading={isLoading} />
+      <PaperUploadBar onAnalyze={handleAnalyze} isLoading={isLoading} showUploadHint={showUploadHint} />
 
       <main className="flex-1 min-h-0">
         {isLoading ? (
