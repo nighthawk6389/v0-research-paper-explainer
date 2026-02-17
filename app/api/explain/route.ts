@@ -1,5 +1,5 @@
 import { consumeStream, convertToModelMessages, streamText, UIMessage } from "ai"
-import { buildExplainSystemPrompt } from "@/lib/prompts"
+import { buildExplainSystemPrompt, type DifficultyLevel } from "@/lib/prompts"
 
 export const maxDuration = 30
 
@@ -9,17 +9,20 @@ export async function POST(req: Request) {
     paperTitle,
     sectionHeading,
     sectionContent,
+    difficultyLevel,
   }: {
     messages: UIMessage[]
     paperTitle: string
     sectionHeading: string
     sectionContent: string
+    difficultyLevel?: DifficultyLevel
   } = await req.json()
 
   const systemPrompt = buildExplainSystemPrompt(
     paperTitle,
     sectionHeading,
-    sectionContent
+    sectionContent,
+    difficultyLevel || "advanced"
   )
 
   const result = streamText({

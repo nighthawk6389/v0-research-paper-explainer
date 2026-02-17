@@ -13,10 +13,18 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { MarkdownContent } from "@/components/markdown-content"
 import { MathBlock } from "@/components/math-block"
-import { Send, Loader2, CornerDownLeft, BookOpen } from "lucide-react"
+import { Send, Loader2, CornerDownLeft, BookOpen, GraduationCap } from "lucide-react"
 import type { Section } from "@/lib/paper-schema"
+import type { DifficultyLevel } from "@/lib/prompts"
 
 interface ExplanationModalProps {
   section: Section | null
@@ -43,6 +51,7 @@ export function ExplanationModal({
   onClose,
 }: ExplanationModalProps) {
   const [input, setInput] = useState("")
+  const [difficultyLevel, setDifficultyLevel] = useState<DifficultyLevel>("advanced")
   const scrollRef = useRef<HTMLDivElement>(null)
   const hasInitiatedRef = useRef(false)
   const currentSectionIdRef = useRef<string | null>(null)
@@ -60,10 +69,11 @@ export function ExplanationModal({
             paperTitle,
             sectionHeading: section?.heading || "",
             sectionContent: sectionContentText,
+            difficultyLevel,
           },
         }),
       }),
-    [paperTitle, section?.heading, sectionContentText]
+    [paperTitle, section?.heading, sectionContentText, difficultyLevel]
   )
 
   const { messages, sendMessage, status, setMessages } = useChat({
@@ -83,6 +93,7 @@ export function ExplanationModal({
       currentSectionIdRef.current = section.id
       hasInitiatedRef.current = false
       setMessages([])
+      // Don't reset difficulty level on section change - user might want to keep their preference
     }
   }, [isOpen, section, setMessages])
 
@@ -152,9 +163,28 @@ export function ExplanationModal({
               {section?.heading || "Section"}
             </SheetTitle>
           </div>
-          <SheetDescription className="text-xs">
-            Ask follow-up questions to deepen your understanding
-          </SheetDescription>
+          <div className="flex items-center justify-between gap-3 mt-2">
+            <SheetDescription className="text-xs">
+              Ask follow-up questions to deepen your understanding
+            </SheetDescription>
+            <div className="flex items-center gap-2 shrink-0">
+              <GraduationCap className="size-3.5 text-muted-foreground" />
+              <Select
+                value={difficultyLevel}
+                onValueChange={(v) => setDifficultyLevel(v as DifficultyLevel)}
+                disabled={isStreaming}
+              >
+                <SelectTrigger className="h-7 text-xs w-[120px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="basic">Basic</SelectItem>
+                  <SelectItem value="advanced">Advanced</SelectItem>
+                  <SelectItem value="phd">PhD Level</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </SheetHeader>
 
         {/* Section preview */}

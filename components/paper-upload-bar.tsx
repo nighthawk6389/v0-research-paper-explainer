@@ -3,10 +3,22 @@
 import { useState, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Upload, Link, Loader2, FileText, X } from "lucide-react"
 
 interface PaperUploadBarProps {
-  onAnalyze: (data: { pdfBase64?: string; url?: string; pdfBlob?: Blob }) => void
+  onAnalyze: (data: {
+    pdfBase64?: string
+    url?: string
+    pdfBlob?: Blob
+    model: string
+  }) => void
   isLoading: boolean
   showUploadHint?: boolean
 }
@@ -16,6 +28,7 @@ export function PaperUploadBar({ onAnalyze, isLoading, showUploadHint }: PaperUp
   const [fileName, setFileName] = useState<string | null>(null)
   const [pdfBase64, setPdfBase64] = useState<string | null>(null)
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null)
+  const [model, setModel] = useState("anthropic/claude-sonnet-4-20250514")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileChange = useCallback(
@@ -53,12 +66,12 @@ export function PaperUploadBar({ onAnalyze, isLoading, showUploadHint }: PaperUp
     (e: React.FormEvent) => {
       e.preventDefault()
       if (pdfBase64) {
-        onAnalyze({ pdfBase64, pdfBlob: pdfBlob || undefined })
+        onAnalyze({ pdfBase64, pdfBlob: pdfBlob || undefined, model })
       } else if (url.trim()) {
-        onAnalyze({ url: url.trim() })
+        onAnalyze({ url: url.trim(), model })
       }
     },
-    [pdfBase64, pdfBlob, url, onAnalyze]
+    [pdfBase64, pdfBlob, url, model, onAnalyze]
   )
 
   const hasInput = pdfBase64 || url.trim()
@@ -69,11 +82,28 @@ export function PaperUploadBar({ onAnalyze, isLoading, showUploadHint }: PaperUp
         onSubmit={handleSubmit}
         className="flex items-center gap-3 px-4 py-3 max-w-screen-2xl mx-auto"
       >
-        <div className="flex items-center gap-2 shrink-0">
-          <FileText className="size-5 text-foreground" />
-          <span className="font-semibold text-sm hidden sm:inline">
-            Paper Explainer
-          </span>
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2">
+            <FileText className="size-5 text-foreground" />
+            <span className="font-semibold text-sm hidden sm:inline">
+              Paper Explainer
+            </span>
+          </div>
+          <Select value={model} onValueChange={setModel} disabled={isLoading}>
+            <SelectTrigger className="h-8 text-xs w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="anthropic/claude-sonnet-4-20250514">
+                Claude Sonnet 4
+              </SelectItem>
+              <SelectItem value="openai/gpt-4o">GPT-4o</SelectItem>
+              <SelectItem value="openai/gpt-4o-mini">GPT-4o Mini</SelectItem>
+              <SelectItem value="anthropic/claude-opus-4-20250514">
+                Claude Opus 4
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex-1 flex items-center gap-2 min-w-0">

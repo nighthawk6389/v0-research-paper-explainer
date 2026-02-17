@@ -36,8 +36,16 @@ export async function POST(req: Request) {
     // Process in background
     ;(async () => {
       try {
-        const { pdfBase64, url: pdfUrl } = await req.json()
+        const { pdfBase64, url: pdfUrl, model } = await req.json()
         let pdfData: string = pdfBase64
+        const selectedModel = model || "anthropic/claude-sonnet-4-20250514"
+        
+        const modelDisplayNames: Record<string, string> = {
+          "anthropic/claude-sonnet-4-20250514": "Claude Sonnet 4",
+          "openai/gpt-4o": "GPT-4o",
+          "openai/gpt-4o-mini": "GPT-4o Mini",
+          "anthropic/claude-opus-4-20250514": "Claude Opus 4",
+        }
 
         send("status", {
           message: "Downloading paper...",
@@ -113,30 +121,32 @@ export async function POST(req: Request) {
           return
         }
 
+        const modelName = modelDisplayNames[selectedModel] || selectedModel
+        
         send("status", {
-          message: "Preparing to meet Claude...",
-          detail: "Waking up Claude Sonnet 4 from its digital slumber",
+          message: `Preparing to meet ${modelName}...`,
+          detail: `Waking up ${modelName} from its digital slumber`,
         })
 
         await new Promise((r) => setTimeout(r, 500))
 
         send("status", {
-          message: "Asking Claude very nicely...",
+          message: `Asking ${modelName} very nicely...`,
           detail:
             "Sending PDF with a 2000+ word prompt explaining what we need",
-          model: "Claude Sonnet 4 (anthropic/claude-sonnet-4-20250514)",
+          model: `${modelName} (${selectedModel})`,
         })
 
         await new Promise((r) => setTimeout(r, 300))
 
         send("status", {
-          message: "Claude is reading...",
+          message: `${modelName} is reading...`,
           detail:
             "Scanning every equation, figure caption, and footnote (even the boring ones)",
         })
 
         const { output } = await generateText({
-          model: "anthropic/claude-sonnet-4-20250514",
+          model: selectedModel,
           output: Output.object({
             schema: paperSchema,
           }),
@@ -190,7 +200,8 @@ export async function POST(req: Request) {
 
   // Non-streaming fallback (original behavior)
   try {
-    const { pdfBase64, url } = await req.json()
+    const { pdfBase64, url, model } = await req.json()
+    const selectedModel = model || "anthropic/claude-sonnet-4-20250514"
 
     let pdfData: string = pdfBase64
 
@@ -266,7 +277,7 @@ export async function POST(req: Request) {
     }
 
     const { output } = await generateText({
-      model: "anthropic/claude-sonnet-4-20250514",
+      model: selectedModel,
       output: Output.object({
         schema: paperSchema,
       }),

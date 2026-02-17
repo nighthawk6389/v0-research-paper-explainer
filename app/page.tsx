@@ -39,7 +39,7 @@ export default function Home() {
   }, [hoveredSection, paper])
 
   const handleAnalyze = useCallback(
-    async (data: { pdfBase64?: string; url?: string; pdfBlob?: Blob }) => {
+    async (data: { pdfBase64?: string; url?: string; pdfBlob?: Blob; model: string }) => {
       setIsLoading(true)
       setError(null)
       setPaper(null)
@@ -63,6 +63,7 @@ export default function Home() {
           body: JSON.stringify({
             pdfBase64: data.pdfBase64,
             url: data.url,
+            model: data.model,
           }),
         })
 

@@ -24,7 +24,30 @@ RULES:
 
 Return valid JSON matching the schema. Do not include any markdown formatting or code fences in your response.`
 
-export const EXPLAIN_SECTION_SYSTEM_PROMPT = `You are an expert academic tutor who excels at explaining complex research papers to someone with college-level math (calculus, linear algebra, probability/statistics, basic differential equations) but NOT PhD-level domain expertise.
+const DIFFICULTY_INSTRUCTIONS = {
+  basic: `Your audience is an undergraduate student with basic math knowledge (algebra, some calculus). Focus on:
+- Using everyday analogies and concrete examples
+- Avoiding jargon or defining ALL technical terms in simple language
+- Breaking down equations into their simplest components
+- Emphasizing intuition over rigor
+- Using visual metaphors where possible`,
+
+  advanced: `Your audience has college-level math (calculus, linear algebra, probability/statistics, basic differential equations) but NOT PhD-level domain expertise. Focus on:
+- Starting with big picture intuition, then diving into mathematical details
+- Defining domain-specific terms clearly
+- Walking through equations step by step with intuition for each term
+- Using analogies to bridge concepts
+- Balancing accessibility with technical accuracy`,
+
+  phd: `Your audience has graduate-level mathematical maturity and domain knowledge. Focus on:
+- Discussing theoretical implications and connections to related work
+- Highlighting subtle technical details and edge cases
+- Explaining proof techniques or derivation strategies
+- Connecting to broader theoretical frameworks
+- Assuming familiarity with advanced concepts (manifolds, measure theory, etc. if relevant)`
+}
+
+export const EXPLAIN_SECTION_SYSTEM_PROMPT = `You are an expert academic tutor who excels at explaining complex research papers.
 
 You are explaining a section from the paper: "{paperTitle}"
 
@@ -35,27 +58,33 @@ Section: {sectionHeading}
 {sectionContent}
 ---
 
+DIFFICULTY LEVEL: {difficultyLevel}
+{difficultyInstructions}
+
 YOUR APPROACH:
 1. Start with the BIG PICTURE: What is this section trying to accomplish? Why does it matter in the context of the paper?
-2. Define domain-specific terms in plain language before using them.
-3. For mathematical content:
-   - Explain what each variable/symbol represents in plain English
-   - Walk through equations step by step, explaining the intuition behind each term
-   - Use analogies where helpful (e.g., "Think of this like..." or "This is similar to...")
-   - Show how the equation connects to the concept being described
-4. Use LaTeX for any math in your explanation (wrap in $...$ for inline, $$...$$ for display).
-5. Keep language accessible but don't oversimplify. The reader is smart, just not a domain expert.
-6. If relevant, mention connections to things the reader likely knows (basic calc concepts, common algorithms, etc.).
+2. For mathematical content:
+   - Explain what each variable/symbol represents
+   - Walk through equations explaining the intuition behind each term
+   - Use analogies where appropriate for the difficulty level
+   - Show how equations connect to the concepts being described
+3. Use LaTeX for any math in your explanation (wrap in $...$ for inline, $$...$$ for display).
+4. Adapt your language and depth to the specified difficulty level.
 
 FORMAT: Use markdown with clear structure. Use bullet points and numbered lists to break down complex ideas.`
+
+export type DifficultyLevel = "basic" | "advanced" | "phd"
 
 export function buildExplainSystemPrompt(
   paperTitle: string,
   sectionHeading: string,
-  sectionContent: string
+  sectionContent: string,
+  difficultyLevel: DifficultyLevel = "advanced"
 ): string {
   return EXPLAIN_SECTION_SYSTEM_PROMPT
     .replace("{paperTitle}", paperTitle)
     .replace("{sectionHeading}", sectionHeading)
     .replace("{sectionContent}", sectionContent)
+    .replace("{difficultyLevel}", difficultyLevel.toUpperCase())
+    .replace("{difficultyInstructions}", DIFFICULTY_INSTRUCTIONS[difficultyLevel])
 }
