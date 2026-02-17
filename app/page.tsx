@@ -50,6 +50,7 @@ export default function Home() {
       }
 
       try {
+        console.log("[v0] Starting parse-paper request")
         const response = await fetch("/api/parse-paper", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -59,11 +60,15 @@ export default function Home() {
           }),
         })
 
+        console.log("[v0] Got response, status:", response.status)
         const result = await response.json()
+        console.log("[v0] Parsed JSON result:", result)
 
         if (!response.ok) {
+          console.log("[v0] Response not ok, handling error")
           // If the server couldn't fetch the URL, show a helpful message
           if (result.fetchFailed) {
+            console.log("[v0] Fetch failed, showing upload hint")
             setError(null)
             setShowUploadHint(true)
             toast.error("Could not download from this URL", {
@@ -72,6 +77,7 @@ export default function Home() {
               duration: 8000,
             })
           } else {
+            console.log("[v0] Throwing error:", result.error)
             throw new Error(result.error || "Failed to parse paper")
           }
           return
@@ -82,11 +88,13 @@ export default function Home() {
           description: `Found ${result.paper.sections.length} sections`,
         })
       } catch (err) {
+        console.log("[v0] Caught error:", err)
         const message =
           err instanceof Error ? err.message : "An error occurred"
         setError(message)
         toast.error("Analysis failed", { description: message })
       } finally {
+        console.log("[v0] Finally block: setting isLoading to false")
         setIsLoading(false)
       }
     },
