@@ -25,6 +25,11 @@ export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showUploadHint, setShowUploadHint] = useState(false)
+  const [loadingStatus, setLoadingStatus] = useState<{
+    message: string
+    detail?: string
+    model?: string
+  } | null>(null)
 
   // Compute highlighted page from hovered section
   const highlightedPage = useMemo(() => {
@@ -39,6 +44,7 @@ export default function Home() {
       setError(null)
       setPaper(null)
       setShowUploadHint(false)
+      setLoadingStatus({ message: "Starting analysis..." })
 
       // Store PDF data for the viewer
       if (data.pdfBase64) {
@@ -50,7 +56,8 @@ export default function Home() {
       }
 
       try {
-        const response = await fetch("/api/parse-paper", {
+        // Use streaming endpoint
+        const response = await fetch("/api/parse-paper?stream=true", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -59,28 +66,59 @@ export default function Home() {
           }),
         })
 
-        const result = await response.json()
-
-        if (!response.ok) {
-          // If the server couldn't fetch the URL, show a helpful message
-          if (result.fetchFailed) {
-            setError(null)
-            setShowUploadHint(true)
-            toast.error("Could not download from this URL", {
-              description:
-                "This publisher blocks automated downloads. Please download the PDF in your browser and use the Upload button instead.",
-              duration: 8000,
-            })
-          } else {
-            throw new Error(result.error || "Failed to parse paper")
-          }
-          return
+        if (!response.ok || !response.body) {
+          throw new Error("Failed to start analysis")
         }
 
-        setPaper(result.paper)
-        toast.success("Paper analyzed successfully", {
-          description: `Found ${result.paper.sections.length} sections`,
-        })
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ""
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split("\n")
+          buffer = lines.pop() || ""
+
+          for (const line of lines) {
+            if (line.startsWith("event:")) {
+              const event = line.slice(6).trim()
+              const nextLine = lines[lines.indexOf(line) + 1]
+              if (nextLine?.startsWith("data:")) {
+                const data = JSON.parse(nextLine.slice(5).trim())
+
+                if (event === "status") {
+                  setLoadingStatus(data)
+                } else if (event === "complete") {
+                  setPaper(data.paper)
+                  toast.success("Paper analyzed successfully", {
+                    description: `Found ${data.paper.sections.length} sections`,
+                  })
+                  setIsLoading(false)
+                  setLoadingStatus(null)
+                  return
+                } else if (event === "error") {
+                  if (data.fetchFailed) {
+                    setError(null)
+                    setShowUploadHint(true)
+                    toast.error("Could not download from this URL", {
+                      description:
+                        "This publisher blocks automated downloads. Please download the PDF in your browser and use the Upload button instead.",
+                      duration: 8000,
+                    })
+                  } else {
+                    throw new Error(data.error || "Failed to parse paper")
+                  }
+                  setIsLoading(false)
+                  setLoadingStatus(null)
+                  return
+                }
+              }
+            }
+          }
+        }
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "An error occurred"
@@ -88,6 +126,7 @@ export default function Home() {
         toast.error("Analysis failed", { description: message })
       } finally {
         setIsLoading(false)
+        setLoadingStatus(null)
       }
     },
     []
@@ -114,7 +153,7 @@ export default function Home() {
 
       <main className="flex-1 min-h-0">
         {isLoading ? (
-          <PaperLoading />
+          <PaperLoading status={loadingStatus || undefined} />
         ) : !hasPaper ? (
           <PaperEmptyState />
         ) : (

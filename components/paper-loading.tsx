@@ -1,9 +1,18 @@
 "use client"
 
 import { Skeleton } from "@/components/ui/skeleton"
-import { Loader2 } from "lucide-react"
+import { Loader2, Sparkles } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 
-export function PaperLoading() {
+interface PaperLoadingProps {
+  status?: {
+    message: string
+    detail?: string
+    model?: string
+  }
+}
+
+export function PaperLoading({ status }: PaperLoadingProps) {
   return (
     <div className="flex h-full">
       {/* Left panel skeleton */}
@@ -12,15 +21,29 @@ export function PaperLoading() {
         <Skeleton className="h-[500px] w-full" />
       </div>
 
-      {/* Right panel skeleton */}
+      {/* Right panel skeleton with status */}
       <div className="flex-1 p-4 space-y-3">
-        <div className="flex items-center gap-3 mb-6">
-          <Loader2 className="size-5 animate-spin text-muted-foreground" />
-          <div className="space-y-1">
-            <p className="text-sm font-medium">Analyzing paper...</p>
-            <p className="text-xs text-muted-foreground">
-              Extracting sections and math notations using AI
-            </p>
+        <div className="mb-6">
+          <div className="flex items-start gap-3">
+            <Loader2 className="size-5 animate-spin text-primary mt-0.5 shrink-0" />
+            <div className="space-y-2 flex-1">
+              <p className="text-sm font-medium leading-snug">
+                {status?.message || "Analyzing paper..."}
+              </p>
+              {status?.detail && (
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {status.detail}
+                </p>
+              )}
+              {status?.model && (
+                <div className="flex items-center gap-2 pt-1">
+                  <Sparkles className="size-3 text-muted-foreground" />
+                  <Badge variant="secondary" className="text-[10px] font-normal">
+                    {status.model}
+                  </Badge>
+                </div>
+              )}
+            </div>
           </div>
         </div>
         <Skeleton className="h-6 w-3/4" />
