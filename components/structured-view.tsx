@@ -29,9 +29,9 @@ export function StructuredView({
   }, [])
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Paper header */}
-      <div className="px-4 pt-4 pb-3 border-b">
+      <div className="px-4 pt-4 pb-3 border-b shrink-0">
         <h1 className="font-bold text-base leading-snug text-balance">
           {paper.title}
         </h1>
@@ -41,7 +41,7 @@ export function StructuredView({
       </div>
 
       {/* Table of contents */}
-      <div className="px-4 py-2 border-b bg-muted/30">
+      <div className="px-4 py-2 border-b bg-muted/30 shrink-0 max-h-24 overflow-y-auto">
         <div className="flex items-center gap-1.5 mb-1.5">
           <BookOpen className="size-3.5 text-muted-foreground" />
           <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
@@ -62,7 +62,8 @@ export function StructuredView({
       </div>
 
       {/* Sections */}
-      <ScrollArea className="flex-1">
+      <div className="flex-1 min-h-0">
+      <ScrollArea className="h-full">
         <div className="p-3 space-y-1">
           {paper.sections.map((section) => (
             <div
@@ -81,6 +82,7 @@ export function StructuredView({
           ))}
         </div>
       </ScrollArea>
+      </div>
     </div>
   )
 }
