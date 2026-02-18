@@ -1,7 +1,7 @@
 import { consumeStream, convertToModelMessages, streamText, UIMessage } from "ai"
 import { buildExplainSystemPrompt, type DifficultyLevel } from "@/lib/prompts"
 
-export const maxDuration = 30
+export const maxDuration = 300
 
 export async function POST(req: Request) {
   const {

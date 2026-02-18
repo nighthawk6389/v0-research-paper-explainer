@@ -2,7 +2,7 @@ import { generateText, Output } from "ai"
 import { paperSchema } from "@/lib/paper-schema"
 import { PARSE_PAPER_PROMPT } from "@/lib/prompts"
 
-export const maxDuration = 60
+export const maxDuration = 300
 
 // Helper to create SSE encoder
 function createSSEStream() {
