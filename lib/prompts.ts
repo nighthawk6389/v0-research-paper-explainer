@@ -1,18 +1,15 @@
 export const PARSE_PAPER_PROMPT = `You are a research paper parser. Your job is to read the attached PDF and extract a structured representation of its content.
 
-CRITICAL RULE — GRANULAR SECTIONS:
-You MUST break the paper into PARAGRAPH-LEVEL chunks, not just top-level sections. Each paragraph or small group of closely related paragraphs should be its own section. This allows readers to click on individual paragraphs for explanations.
+SECTION GRANULARITY RULE:
+Break the paper into subsections that are more granular than just top-level sections, but NOT so granular that equations are isolated from their context. Each section should contain a coherent "chunk" of content - a concept, derivation, or explanation with its associated math.
 
-For example, if section "3. Methodology" has 4 paragraphs and 2 equations, you should produce roughly 4-6 sections from it:
-  - "3. Methodology" (the introductory paragraph)
-  - "3. Methodology — Data Preprocessing" (second paragraph about data)
-  - "3. Methodology — Loss Function" (paragraph introducing the loss function)
-  - "3. Methodology — Eq. (4): Cross-Entropy Loss" (the equation block with surrounding context)
-  - "3. Methodology — Optimization" (paragraph about optimizer choice)
-  - etc.
+For example, if section "3. Methodology" has multiple topics, you should produce subsections like:
+  - "3. Methodology" (the introductory overview)
+  - "3.1 Data Preprocessing" (all paragraphs and equations related to preprocessing together)
+  - "3.2 Loss Function" (paragraph introducing the loss + the equation + explanation of terms)
+  - "3.3 Optimization" (paragraph about optimizer + any relevant equations)
 
-Use the pattern: "Original Section Title — Short Descriptor" for sub-chunks.
-If a paragraph is very short (1-2 sentences), you may group it with the next paragraph.
+CRITICAL: Keep equations WITH their explanatory context. Do NOT create separate sections for individual equations.
 
 RULES:
 1. Extract the paper title, author names, and the full abstract.
@@ -20,11 +17,10 @@ RULES:
    - Do NOT include anything before the abstract (title page headers, author affiliations, etc.)
    - Do NOT include the references/bibliography section itself
    - DO include the conclusion/summary if it appears before references
-3. For each section chunk, create a clear heading:
-   - For top-level section intros: use the heading as-is (e.g., "3. Methodology")
-   - For sub-paragraphs: use "Section Title — Topic" format (e.g., "3. Methodology — Regularization")
-   - For equations: use "Section Title — Eq. (N): Description" if numbered
-4. Break each section chunk into content blocks:
+3. For each section, use clear headings that reflect the content hierarchy:
+   - For numbered subsections in the paper: preserve as-is (e.g., "3.1 Data Preprocessing")
+   - For unnumbered subsections: use "Section Title — Subtopic" format (e.g., "Introduction — Motivation")
+4. Break each section into content blocks:
    - "text" blocks: prose paragraphs. Keep them as complete paragraphs.
    - "math" blocks: mathematical equations and formulas. These MUST be valid LaTeX.
      - For display/block equations: set isInline to false.
@@ -35,11 +31,11 @@ RULES:
    - Use standard LaTeX notation: \\frac{}{}, \\sum_{}, \\int_{}, \\alpha, \\beta, etc.
    - Multi-line equations (align environments) should stay as one block.
    - Matrices, systems of equations, and piecewise functions should stay as single blocks.
-6. Page numbers: note which page(s) each section chunk spans (1-indexed).
+6. Page numbers: note which page(s) each section spans (1-indexed).
 7. The section id should be sequential: "section-0", "section-1", "section-2", etc.
 8. Include the abstract as the first section with id "section-0" and heading "Abstract".
 
-AIM for roughly 1-3 paragraphs per section chunk. A 10-page paper should produce roughly 30-60 section chunks.
+AIM for roughly 10-20 sections for a 10-page paper. Each section should contain 2-5 paragraphs or a substantial concept with its math.
 
 Return valid JSON matching the schema. Do not include any markdown formatting or code fences in your response.`
 
