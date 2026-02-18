@@ -4,7 +4,8 @@ import { useMemo } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
-import remarkGfm from "remark-gfm"
+// TODO: Re-enable after remark-gfm is installed
+// import remarkGfm from "remark-gfm"
 
 interface MarkdownContentProps {
   content: string
@@ -38,7 +39,7 @@ export function MarkdownContent({ content }: MarkdownContentProps) {
   return (
     <div className="explanation-content prose prose-sm dark:prose-invert max-w-none">
       <ReactMarkdown
-        remarkPlugins={[remarkMath, remarkGfm]}
+        remarkPlugins={[remarkMath]}
         rehypePlugins={[
           [rehypeKatex, {
             trust: true,

@@ -304,7 +304,7 @@ export function ExplanationModal({
             </div>
             <ScrollArea className="flex-1">
               <div className="p-5 space-y-3">
-                {section?.content.map((block, idx) => {
+                {section?.content?.map((block, idx) => {
                   if (block.type === "math") {
                     const isExpanded = expandedFormula === `${section.id}-${idx}`
                     return (
