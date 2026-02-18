@@ -42,7 +42,6 @@ export async function POST(req: Request) {
         
         const modelDisplayNames: Record<string, string> = {
           "anthropic/claude-sonnet-4.5-20250219": "Claude Sonnet 4.5",
-          "anthropic/claude-haiku-4.5-20250305": "Claude Haiku 4.5",
           "openai/gpt-4o": "GPT-4o",
           "openai/gpt-4o-mini": "GPT-4o Mini",
           "anthropic/claude-opus-4-20250514": "Claude Opus 4",
