@@ -33,7 +33,8 @@ export async function POST(req: Request) {
 
   console.log("[v0] Deep-dive request started", {
     paperTitle,
-    latexPreview: latex.substring(0, 100) + (latex.length > 100 ? "..." : ""),
+    latexLength: latex?.length || 0,
+    latexPreview: latex ? latex.substring(0, 50) + (latex.length > 50 ? "..." : "") : "EMPTY",
     messageCount: messages.length,
     requestedModel: model,
     timestamp: new Date().toISOString(),

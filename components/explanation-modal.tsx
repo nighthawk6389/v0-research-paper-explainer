@@ -63,6 +63,15 @@ export function ExplanationModal({
 
   const sectionContentText = section ? buildSectionContentText(section) : ""
 
+  useEffect(() => {
+    console.log("[v0] Explanation modal content:", {
+      hasSection: !!section,
+      sectionId: section?.id,
+      contentLength: sectionContentText.length,
+      heading: section?.heading,
+    })
+  }, [section, sectionContentText])
+
   // Build context of previous sections for the LLM
   const previousSectionsContext = useMemo(() => {
     if (!section) return ""
@@ -85,8 +94,8 @@ export function ExplanationModal({
     () =>
       new DefaultChatTransport({
         api: "/api/explain",
-        prepareSendMessagesRequest: ({ id, messages }) => ({
-          body: {
+        prepareSendMessagesRequest: ({ id, messages }) => {
+          const body = {
             id,
             messages,
             paperTitle,
@@ -95,8 +104,14 @@ export function ExplanationModal({
             sectionContent: sectionContentText,
             previousSectionsContext,
             difficultyLevel,
-          },
-        }),
+          }
+          console.log("[v0] Sending explain request with content:", {
+            contentLength: sectionContentText.length,
+            heading: section?.heading,
+            messageCount: messages.length,
+          })
+          return { body }
+        },
       }),
     [paperTitle, paperAbstract, section?.heading, sectionContentText, previousSectionsContext, difficultyLevel]
   )

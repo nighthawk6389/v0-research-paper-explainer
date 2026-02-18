@@ -48,15 +48,21 @@ export function DeepDiveModal({
     () =>
       new DefaultChatTransport({
         api: "/api/deep-dive",
-        prepareSendMessagesRequest: ({ id, messages }) => ({
-          body: {
+        prepareSendMessagesRequest: ({ id, messages }) => {
+          const body = {
             id,
             messages,
             latex: latex || "",
             sectionContext,
             paperTitle,
-          },
-        }),
+          }
+          console.log("[v0] Sending deep-dive request with latex:", {
+            latexLength: (latex || "").length,
+            latexPreview: latex ? latex.substring(0, 50) : "",
+            messageCount: messages.length,
+          })
+          return { body }
+        },
       }),
     [latex, sectionContext, paperTitle]
   )
@@ -70,6 +76,14 @@ export function DeepDiveModal({
     id: stableId,
     transport,
   })
+
+  useEffect(() => {
+    console.log("[v0] Deep dive modal latex:", {
+      hasLatex: !!latex,
+      latexLength: latex?.length || 0,
+      latexPreview: latex ? latex.substring(0, 50) : "",
+    })
+  }, [latex])
 
   const isStreaming = status === "streaming" || status === "submitted"
 
