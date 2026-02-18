@@ -94,11 +94,24 @@ export async function setCachedPaper(
   pdfUrl: string | null,
   model: string
 ): Promise<void> {
-  if (!isClient()) return
+  if (!isClient()) {
+    console.log("[v0] Cache write skipped: not in browser")
+    return
+  }
   
   try {
     const content = pdfBase64 || pdfUrl || ""
-    if (!content) return
+    if (!content) {
+      console.log("[v0] Cache write skipped: no content")
+      return
+    }
+    
+    console.log("[v0] Attempting to cache paper", {
+      title: paper.title,
+      sections: paper.sections.length,
+      contentLength: content.length,
+      model,
+    })
 
     const hash = await hashPdfContent(content)
     const db = await openDB()
