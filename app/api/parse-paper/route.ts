@@ -38,10 +38,10 @@ export async function POST(req: Request) {
       try {
         const { pdfBase64, url: pdfUrl, model } = await req.json()
         let pdfData: string = pdfBase64
-        const selectedModel = model || "anthropic/claude-sonnet-4.5-20250219"
+        const selectedModel = model || "anthropic/claude-sonnet-4.5"
         
         const modelDisplayNames: Record<string, string> = {
-          "anthropic/claude-sonnet-4.5-20250219": "Claude Sonnet 4.5",
+          "anthropic/claude-sonnet-4.5": "Claude Sonnet 4.5",
           "anthropic/claude-haiku-4.5": "Claude Haiku 4.5",
           "openai/gpt-4o": "GPT-4o",
           "openai/gpt-4o-mini": "GPT-4o Mini",
@@ -202,7 +202,7 @@ export async function POST(req: Request) {
   // Non-streaming fallback (original behavior)
   try {
     const { pdfBase64, url, model } = await req.json()
-    const selectedModel = model || "anthropic/claude-sonnet-4.5-20250219"
+    const selectedModel = model || "anthropic/claude-sonnet-4.5"
 
     let pdfData: string = pdfBase64
 

@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     difficultyLevel || "advanced"
   )
 
-  const selectedModel = model || "anthropic/claude-sonnet-4.5-20250219"
+  const selectedModel = model || "anthropic/claude-sonnet-4.5"
 
   const result = streamText({
     model: selectedModel,

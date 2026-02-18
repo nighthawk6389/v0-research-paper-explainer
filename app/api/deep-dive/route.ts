@@ -99,7 +99,7 @@ YOUR ROLE:
 
 Be thorough but accessible. Aim for "aha!" moments where computation illuminates theory.`
 
-  const selectedModel = model || "anthropic/claude-sonnet-4.5-20250219"
+  const selectedModel = model || "anthropic/claude-sonnet-4.5"
 
   const result = streamText({
     model: selectedModel,
