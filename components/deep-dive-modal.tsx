@@ -21,8 +21,8 @@ import {
   Loader2,
   CornerDownLeft,
   Sigma,
-  ExternalLink,
   ImageIcon,
+  ChevronRight,
 } from "lucide-react"
 
 interface DeepDiveModalProps {
@@ -141,21 +141,25 @@ export function DeepDiveModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-0 gap-0">
-        <DialogHeader className="px-5 pt-5 pb-3 border-b shrink-0">
-          <div className="flex items-center gap-2">
-            <Sigma className="size-4 text-orange-500 shrink-0" />
-            <DialogTitle className="text-sm">
-              Deep Dive with Wolfram Alpha
-            </DialogTitle>
+      <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0 gap-0">
+        <DialogHeader className="px-6 pt-5 pb-4 border-b shrink-0 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20">
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 rounded-lg bg-orange-500/10">
+              <Sigma className="size-5 text-orange-600 dark:text-orange-400" />
+            </div>
+            <div>
+              <DialogTitle className="text-base font-semibold">
+                Deep Dive Analysis
+              </DialogTitle>
+              <DialogDescription className="text-xs mt-0.5">
+                Mathematical analysis powered by Wolfram Alpha
+              </DialogDescription>
+            </div>
           </div>
-          <DialogDescription className="text-xs">
-            AI-powered mathematical analysis with Wolfram Alpha computations
-          </DialogDescription>
           {/* Show the equation being analyzed */}
           {latex && (
-            <div className="mt-2">
-              <MathBlock latex={latex} displayMode={true} className="text-sm" />
+            <div className="mt-3 p-3 bg-white dark:bg-gray-900 rounded-lg border shadow-sm">
+              <MathBlock latex={latex} displayMode={true} />
             </div>
           )}
         </DialogHeader>
@@ -163,7 +167,7 @@ export function DeepDiveModal({
         {/* Messages */}
         <div className="flex-1 min-h-0 overflow-hidden" ref={scrollRef}>
           <ScrollArea className="h-full">
-            <div className="px-5 py-4 space-y-4">
+            <div className="px-6 py-4 space-y-5">
               {messages.map((message, idx) => {
                 const text = getMessageText(message)
                 const toolCalls = getToolCalls(message)
@@ -174,7 +178,7 @@ export function DeepDiveModal({
                 if (message.role === "user") {
                   return (
                     <div key={message.id} className="flex justify-end">
-                      <div className="bg-primary text-primary-foreground rounded-lg px-3 py-2 text-sm max-w-[85%]">
+                      <div className="bg-primary text-primary-foreground rounded-xl px-4 py-2.5 text-sm max-w-[80%] shadow-sm">
                         {text}
                       </div>
                     </div>
@@ -182,107 +186,184 @@ export function DeepDiveModal({
                 }
 
                 return (
-                  <div key={message.id} className="space-y-3">
-                    {/* Tool invocations */}
-                    {toolCalls.map((tc) => (
-                      <div
-                        key={tc.toolInvocationId}
-                        className="border rounded-lg bg-orange-50/50 dark:bg-orange-950/20 border-orange-200/50 dark:border-orange-800/30"
-                      >
-                        <div className="flex items-center gap-2 px-3 py-2 border-b border-orange-200/30 dark:border-orange-800/20">
-                          <ExternalLink className="size-3 text-orange-600" />
-                          <span className="text-xs font-medium text-orange-700 dark:text-orange-300">
-                            Wolfram Alpha Query
-                          </span>
-                          {tc.state === "output-available" ? (
-                            <Badge
-                              variant="secondary"
-                              className="text-[9px] ml-auto bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                            >
-                              Complete
-                            </Badge>
-                          ) : (
-                            <Loader2 className="size-3 animate-spin text-orange-500 ml-auto" />
-                          )}
-                        </div>
-                        <div className="px-3 py-2">
-                          {"input" in tc && tc.input && (
-                            <div className="space-y-1">
-                              <p className="text-xs text-muted-foreground">
-                                <span className="font-medium">Query: </span>
-                                <code className="bg-muted px-1 py-0.5 rounded text-[11px]">
-                                  {(tc.input as { query?: string })?.query}
-                                </code>
-                              </p>
-                              {(tc.input as { purpose?: string })?.purpose && (
-                                <p className="text-[11px] text-muted-foreground italic">
-                                  {(tc.input as { purpose?: string })?.purpose}
-                                </p>
-                              )}
-                            </div>
-                          )}
-                          {tc.state === "output-available" && tc.output && (
-                            <div className="mt-2">
-                              {/* Show images from Wolfram Alpha */}
-                              {(tc.output as any)?.images?.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mb-2">
-                                  {(
-                                    tc.output as {
-                                      images: {
-                                        title: string
-                                        src: string
-                                        alt: string
-                                      }[]
-                                    }
-                                  ).images
-                                    .slice(0, 4)
-                                    .map(
-                                      (
-                                        img: {
-                                          title: string
-                                          src: string
-                                          alt: string
-                                        },
-                                        i: number
-                                      ) => (
-                                        <div
-                                          key={i}
-                                          className="bg-white rounded border p-1"
-                                        >
-                                          <img
-                                            src={img.src}
-                                            alt={img.alt}
-                                            className="max-h-24"
-                                            crossOrigin="anonymous"
-                                          />
-                                        </div>
-                                      )
+                  <div key={message.id} className="space-y-4">
+                    {/* Wolfram Alpha Pods */}
+                    {toolCalls.map((tc, tcIdx) => {
+                      const input = ("input" in tc && tc.input) as {
+                        query?: string
+                        purpose?: string
+                      }
+                      const output = tc.state === "output-available" ? (tc.output as {
+                        pods?: Array<{
+                          title: string
+                          plaintext?: string
+                          images: Array<{ src: string; alt: string; title: string }>
+                        }>
+                        images?: Array<{ src: string; alt: string; title: string }>
+                        error?: string
+                      }) : null
+
+                      return (
+                        <div
+                          key={tc.toolInvocationId}
+                          className="wolfram-pod border rounded-xl overflow-hidden bg-gradient-to-br from-white to-orange-50/30 dark:from-gray-900 dark:to-orange-950/10 shadow-md"
+                        >
+                          {/* Pod Header */}
+                          <div className="px-4 py-3 border-b bg-orange-500/5 dark:bg-orange-500/10">
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <div className="p-1 rounded bg-orange-500/10">
+                                  <Sigma className="size-3.5 text-orange-600 dark:text-orange-400" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-semibold text-orange-900 dark:text-orange-100">
+                                      Wolfram Alpha Query {tcIdx + 1}
+                                    </span>
+                                    {tc.state === "output-available" ? (
+                                      <Badge
+                                        variant="secondary"
+                                        className="text-[9px] bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300"
+                                      >
+                                        Complete
+                                      </Badge>
+                                    ) : (
+                                      <Badge
+                                        variant="secondary"
+                                        className="text-[9px] bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
+                                      >
+                                        <Loader2 className="size-2.5 animate-spin mr-1" />
+                                        Computing
+                                      </Badge>
                                     )}
+                                  </div>
+                                  {input?.purpose && (
+                                    <p className="text-[11px] text-muted-foreground italic mt-0.5 truncate">
+                                      {input.purpose}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            {input?.query && (
+                              <div className="mt-2 flex items-center gap-1.5">
+                                <ChevronRight className="size-3 text-muted-foreground" />
+                                <code className="text-[11px] bg-white dark:bg-gray-800 px-2 py-0.5 rounded border font-mono text-orange-700 dark:text-orange-300">
+                                  {input.query}
+                                </code>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Pod Content */}
+                          {tc.state === "output-available" && output && (
+                            <div className="p-4">
+                              {output.error ? (
+                                <p className="text-xs text-destructive italic">
+                                  {output.error}
+                                </p>
+                              ) : (
+                                <div className="space-y-3">
+                                  {/* Show images in a grid */}
+                                  {output.images && output.images.length > 0 && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                      {output.images.map((img, imgIdx) => (
+                                        <div
+                                          key={imgIdx}
+                                          className="flex flex-col gap-1.5"
+                                        >
+                                          {img.title && (
+                                            <div className="text-[11px] font-medium text-muted-foreground px-1">
+                                              {img.title}
+                                            </div>
+                                          )}
+                                          <div className="bg-white dark:bg-gray-800 rounded-lg border p-2 flex items-center justify-center">
+                                            <img
+                                              src={img.src}
+                                              alt={img.alt}
+                                              className="max-w-full h-auto"
+                                              crossOrigin="anonymous"
+                                            />
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {/* Show pods if available */}
+                                  {output.pods && output.pods.length > 0 && (
+                                    <div className="space-y-2">
+                                      {output.pods.slice(0, 6).map((pod, podIdx) => (
+                                        <div
+                                          key={podIdx}
+                                          className="border rounded-lg p-3 bg-white/50 dark:bg-gray-800/50"
+                                        >
+                                          <div className="text-[11px] font-semibold text-foreground mb-1.5">
+                                            {pod.title}
+                                          </div>
+                                          {pod.plaintext && (
+                                            <p className="text-xs text-muted-foreground leading-relaxed">
+                                              {pod.plaintext}
+                                            </p>
+                                          )}
+                                          {pod.images.length > 0 && (
+                                            <div className="mt-2 flex flex-wrap gap-2">
+                                              {pod.images.map((img, imgIdx) => (
+                                                <div
+                                                  key={imgIdx}
+                                                  className="bg-white dark:bg-gray-900 rounded border p-1.5"
+                                                >
+                                                  <img
+                                                    src={img.src}
+                                                    alt={img.alt}
+                                                    className="max-h-20 h-auto"
+                                                    crossOrigin="anonymous"
+                                                  />
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                               )}
-                              {(tc.output as any)?.error && (
-                                <p className="text-xs text-destructive">
-                                  {(tc.output as any).error}
-                                </p>
-                              )}
                             </div>
                           )}
-                        </div>
-                      </div>
-                    ))}
 
-                    {/* Text content */}
-                    {text && <MarkdownContent content={text} />}
+                          {tc.state === "input-streaming" ||
+                            (tc.state === "input-available" && (
+                              <div className="p-4 flex items-center gap-2 text-xs text-muted-foreground">
+                                <Loader2 className="size-3 animate-spin" />
+                                <span>Waiting for computation...</span>
+                              </div>
+                            ))}
+                        </div>
+                      )
+                    })}
+
+                    {/* AI Commentary */}
+                    {text && (
+                      <div className="text-sm leading-relaxed text-foreground/90 space-y-2">
+                        <MarkdownContent content={text} />
+                      </div>
+                    )}
                   </div>
                 )
               })}
 
               {isStreaming && messages.length === 0 && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="size-4 animate-spin" />
-                  <span>
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="p-3 rounded-full bg-orange-100 dark:bg-orange-900/20 mb-3">
+                    <Loader2 className="size-6 animate-spin text-orange-600 dark:text-orange-400" />
+                  </div>
+                  <p className="text-sm font-medium text-foreground">
                     Preparing deep dive analysis...
-                  </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Consulting with Wolfram Alpha
+                  </p>
                 </div>
               )}
             </div>
@@ -290,14 +371,14 @@ export function DeepDiveModal({
         </div>
 
         {/* Chat input */}
-        <div className="border-t p-4 shrink-0">
+        <div className="border-t p-4 shrink-0 bg-muted/20">
           <form onSubmit={handleSubmit} className="flex items-center gap-2">
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask about this equation, request a derivation, plot..."
               disabled={isStreaming}
-              className="flex-1 h-9"
+              className="flex-1 h-9 text-sm"
             />
             <Button
               type="submit"
@@ -313,11 +394,11 @@ export function DeepDiveModal({
               <span className="sr-only">Send</span>
             </Button>
           </form>
-          <div className="flex items-center gap-1 mt-1.5 text-[10px] text-muted-foreground">
+          <div className="flex items-center gap-1 mt-2 text-[10px] text-muted-foreground">
             <CornerDownLeft className="size-3" />
             <span>
-              Try: "derive this step by step", "plot this function",
-              "what happens when x approaches 0"
+              Try: "derive this step by step", "plot this function", "what
+              happens when x approaches 0"
             </span>
           </div>
         </div>

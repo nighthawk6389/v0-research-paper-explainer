@@ -140,13 +140,153 @@
   user-select: text;
 }
 
-/* Prose styling for explanation content */
-.prose :where(h1, h2, h3, h4):not(:first-child) {
-  margin-top: 1.25em;
+/* Enhanced prose styling for explanation content */
+.explanation-content {
+  font-size: 0.8125rem; /* 13px */
+  line-height: 1.6;
 }
 
-.prose :where(ul, ol) {
-  padding-left: 1.25em;
+.explanation-content :where(h1) {
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin-top: 1.5em;
+  margin-bottom: 0.75em;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid oklch(0.85 0 0);
+  color: var(--foreground);
+}
+
+.explanation-content :where(h2) {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 1.25em;
+  margin-bottom: 0.5em;
+  color: var(--foreground);
+  background: linear-gradient(to right, oklch(0.96 0 0), transparent);
+  padding: 0.25em 0.5em;
+  border-left: 3px solid oklch(0.7 0 0);
+}
+
+.explanation-content :where(h3) {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.4em;
+  color: var(--foreground);
+}
+
+.explanation-content :where(h4) {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-top: 0.875em;
+  margin-bottom: 0.375em;
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+.explanation-content :where(p) {
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+  color: oklch(0.35 0 0);
+}
+
+.dark .explanation-content :where(p) {
+  color: oklch(0.8 0 0);
+}
+
+.explanation-content :where(ul, ol) {
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+  padding-left: 1.5em;
+}
+
+.explanation-content :where(li) {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+  color: oklch(0.35 0 0);
+}
+
+.dark .explanation-content :where(li) {
+  color: oklch(0.8 0 0);
+}
+
+.explanation-content :where(strong) {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.explanation-content :where(em) {
+  font-style: italic;
+  color: oklch(0.4 0 0);
+}
+
+.dark .explanation-content :where(em) {
+  color: oklch(0.75 0 0);
+}
+
+.explanation-content :where(code) {
+  font-size: 0.8em;
+  font-family: var(--font-mono);
+  background: oklch(0.96 0 0);
+  color: oklch(0.3 0 0);
+  padding: 0.125em 0.375em;
+  border-radius: 0.25em;
+  font-weight: 500;
+}
+
+.dark .explanation-content :where(code) {
+  background: oklch(0.25 0 0);
+  color: oklch(0.85 0 0);
+}
+
+.explanation-content :where(pre) {
+  background: oklch(0.97 0 0);
+  border: 1px solid oklch(0.9 0 0);
+  border-radius: 0.375em;
+  padding: 0.75em;
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+.dark .explanation-content :where(pre) {
+  background: oklch(0.2 0 0);
+  border-color: oklch(0.3 0 0);
+}
+
+/* Make inline math stand out with subtle background */
+.explanation-content .katex {
+  font-size: 1em !important;
+  background: oklch(0.98 0.02 250 / 0.3);
+  padding: 0.125em 0.25em;
+  border-radius: 0.25em;
+}
+
+.dark .explanation-content .katex {
+  background: oklch(0.25 0.02 250 / 0.3);
+}
+
+/* Display math gets more breathing room */
+.explanation-content .katex-display {
+  margin: 1.25em 0 !important;
+  padding: 1em;
+  background: oklch(0.985 0 0);
+  border-radius: 0.5em;
+  border: 1px solid oklch(0.92 0 0);
+}
+
+.dark .explanation-content .katex-display {
+  background: oklch(0.18 0 0);
+  border-color: oklch(0.28 0 0);
+}
+
+/* Wolfram Alpha pod styling */
+.wolfram-pod {
+  transition: all 0.2s ease;
+}
+
+.wolfram-pod:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
 }
 
 /* Scrollbar styling */
