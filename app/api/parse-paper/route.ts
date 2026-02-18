@@ -1,4 +1,4 @@
-import { streamObject, Output } from "ai"
+import { streamObject, generateText, Output } from "ai"
 import { paperSchema } from "@/lib/paper-schema"
 import { PARSE_PAPER_PROMPT } from "@/lib/prompts"
 
@@ -161,9 +161,7 @@ export async function POST(req: Request) {
         
         const result = streamObject({
           model: selectedModel,
-          output: Output.object({
-            schema: paperSchema,
-          }),
+          schema: paperSchema,
           messages: [
             {
               role: "user",
