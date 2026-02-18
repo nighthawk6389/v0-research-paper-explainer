@@ -61,10 +61,11 @@ export function DeepDiveModal({
     [latex, sectionContext, paperTitle]
   )
 
-  // Use a stable ID based on initial latex value
+  // Use a stable ID based on latex hash
   const stableId = useMemo(() => {
-    return `deep-dive-${Date.now()}-${Math.random()}`
-  }, [])
+    const hash = latex ? latex.substring(0, 50).replace(/[^a-zA-Z0-9]/g, "") : "empty"
+    return `deep-dive-${hash}`
+  }, [latex])
 
   const { messages, sendMessage, status, setMessages } = useChat({
     id: stableId,
@@ -289,7 +290,7 @@ export function DeepDiveModal({
                                   {/* Show pods if available */}
                                   {output.pods && output.pods.length > 0 && (
                                     <div className="space-y-2">
-                                      {output.pods.slice(0, 6).map((pod, podIdx) => (
+                                      {output.pods.slice(0, 6).map((pod: any, podIdx: number) => (
                                         <div
                                           key={podIdx}
                                           className="border rounded-lg p-3 bg-white/50 dark:bg-gray-800/50"
@@ -297,28 +298,25 @@ export function DeepDiveModal({
                                           <div className="text-[11px] font-semibold text-foreground mb-1.5">
                                             {pod.title}
                                           </div>
-                                          {pod.plaintext && (
-                                            <p className="text-xs text-muted-foreground leading-relaxed">
-                                              {pod.plaintext}
-                                            </p>
-                                          )}
-                                          {pod.images.length > 0 && (
-                                            <div className="mt-2 flex flex-wrap gap-2">
-                                              {pod.images.map((img, imgIdx) => (
-                                                <div
-                                                  key={imgIdx}
-                                                  className="bg-white dark:bg-gray-900 rounded border p-1.5"
-                                                >
+                                          {pod.subpods && pod.subpods.map((subpod: any, subIdx: number) => (
+                                            <div key={subIdx} className="space-y-2">
+                                              {subpod.plaintext && (
+                                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                                  {subpod.plaintext}
+                                                </p>
+                                              )}
+                                              {subpod.img && (
+                                                <div className="bg-white dark:bg-gray-900 rounded border p-2 flex items-center justify-center">
                                                   <img
-                                                    src={img.src}
-                                                    alt={img.alt}
-                                                    className="max-h-20 h-auto"
+                                                    src={subpod.img.src}
+                                                    alt={subpod.img.alt || pod.title}
+                                                    className="max-w-full h-auto"
                                                     crossOrigin="anonymous"
                                                   />
                                                 </div>
-                                              ))}
+                                              )}
                                             </div>
-                                          )}
+                                          ))}
                                         </div>
                                       ))}
                                     </div>

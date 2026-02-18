@@ -76,10 +76,10 @@ export function ExplanationModal({
       .join("\n\n")
   }, [section, allSections])
 
-  // Use a stable ID that doesn't change during render
+  // Use a stable ID per section
   const stableId = useMemo(() => {
-    return `explain-${Date.now()}-${Math.random()}`
-  }, [])
+    return `explain-${section?.id || "default"}`
+  }, [section?.id])
 
   const transport = useMemo(
     () =>

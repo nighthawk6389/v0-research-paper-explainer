@@ -29,6 +29,7 @@ export async function POST(req: Request) {
   console.log("[v0] Explain request started", {
     paperTitle,
     sectionHeading,
+    contentLength: sectionContent?.length || 0,
     difficultyLevel: difficultyLevel || "advanced",
     messageCount: messages.length,
     hasPreviousContext: !!previousSectionsContext,

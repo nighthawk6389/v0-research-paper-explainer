@@ -8,6 +8,7 @@ import { ExplanationModal } from "@/components/explanation-modal"
 import { DeepDiveModal } from "@/components/deep-dive-modal"
 import { PaperLoading } from "@/components/paper-loading"
 import { PaperEmptyState } from "@/components/paper-empty-state"
+import { getCachedPaper, setCachedPaper } from "@/lib/paper-cache"
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -44,32 +45,44 @@ export default function Home() {
   }, [hoveredSection, paper])
 
   const handleAnalyze = useCallback(
-    async (data: { pdfBase64?: string; url?: string; pdfBlob?: Blob; model: string }) => {
+    async (uploadData: { pdfBase64?: string; url?: string; pdfBlob?: Blob; model: string }) => {
       setIsLoading(true)
       setError(null)
       setPaper(null)
       setShowUploadHint(false)
       setLoadingStatus({ message: "Starting analysis..." })
-      setSelectedModel(data.model)
+      setSelectedModel(uploadData.model)
 
       // Store PDF data for the viewer
-      if (data.pdfBase64) {
-        setPdfBase64(data.pdfBase64)
+      if (uploadData.pdfBase64) {
+        setPdfBase64(uploadData.pdfBase64)
         setPdfUrl(null)
-      } else if (data.url) {
+      } else if (uploadData.url) {
         setPdfBase64(null)
-        setPdfUrl(data.url)
+        setPdfUrl(uploadData.url)
       }
 
       try {
+        // Check cache first
+        const cached = await getCachedPaper(uploadData.pdfBase64, uploadData.url)
+        if (cached) {
+          setPaper(cached.paper)
+          toast.success("Loaded from cache", {
+            description: `${cached.paper.title} - ${cached.paper.sections.length} sections`,
+          })
+          setIsLoading(false)
+          setLoadingStatus(null)
+          return
+        }
+
         // Use streaming endpoint
         const response = await fetch("/api/parse-paper?stream=true", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            pdfBase64: data.pdfBase64,
-            url: data.url,
-            model: data.model,
+            pdfBase64: uploadData.pdfBase64,
+            url: uploadData.url,
+            model: uploadData.model,
           }),
         })
 
@@ -100,6 +113,17 @@ export default function Home() {
                   setLoadingStatus(data)
                 } else if (event === "complete") {
                   setPaper(data.paper)
+                  
+                  // Cache the parsed paper using original upload data
+                  await setCachedPaper(
+                    data.paper,
+                    uploadData.pdfBase64 || "",
+                    uploadData.url || null,
+                    selectedModel
+                  ).catch((err) => {
+                    console.error("[v0] Failed to cache paper:", err)
+                  })
+                  
                   toast.success("Paper analyzed successfully", {
                     description: `Found ${data.paper.sections.length} sections`,
                   })

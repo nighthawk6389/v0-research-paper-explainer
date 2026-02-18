@@ -33,7 +33,8 @@ export async function POST(req: Request) {
 
   console.log("[v0] Deep-dive request started", {
     paperTitle,
-    latexPreview: latex.substring(0, 100) + (latex.length > 100 ? "..." : ""),
+    latexLength: latex?.length || 0,
+    latexPreview: latex ? latex.substring(0, 50) + (latex.length > 50 ? "..." : "") : "EMPTY",
     messageCount: messages.length,
     requestedModel: model,
     timestamp: new Date().toISOString(),
@@ -118,6 +119,13 @@ YOUR ROLE:
 6. Use LaTeX ($...$ for inline, $$...$$ for display) in your own explanations.
 7. If Wolfram Alpha fails for a query, explain the math yourself or try a simpler query.
 8. Include any Wolfram Alpha plots/images in your response — they are very helpful for intuition.
+
+IMPORTANT FORMATTING RULES:
+- DO NOT output your thinking or planning (e.g., "Let me explore...", "Now let me...", "Great!"). Just make tool calls silently.
+- Start your response directly with the explanation, not with meta-commentary about what you're about to do.
+- Use proper markdown formatting with blank lines between sections.
+- Use ## for section headers, and ensure there's a blank line before and after headers.
+- When transitioning between topics, use clear section breaks with headers.
 
 Be thorough but accessible. Aim for "aha!" moments where computation illuminates theory.`
 
