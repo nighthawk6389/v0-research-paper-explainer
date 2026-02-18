@@ -279,6 +279,47 @@
   border-color: oklch(0.28 0 0);
 }
 
+/* Table styling for markdown content */
+.explanation-content :where(table) {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  margin: 1em 0;
+}
+
+.explanation-content :where(th) {
+  background: oklch(0.96 0 0);
+  font-weight: 600;
+  text-align: left;
+  padding: 0.5em 0.75em;
+  border: 1px solid oklch(0.9 0 0);
+  color: var(--foreground);
+}
+
+.dark .explanation-content :where(th) {
+  background: oklch(0.22 0 0);
+  border-color: oklch(0.3 0 0);
+}
+
+.explanation-content :where(td) {
+  padding: 0.4em 0.75em;
+  border: 1px solid oklch(0.92 0 0);
+  color: oklch(0.35 0 0);
+}
+
+.dark .explanation-content :where(td) {
+  border-color: oklch(0.28 0 0);
+  color: oklch(0.8 0 0);
+}
+
+.explanation-content :where(tr:nth-child(even)) {
+  background: oklch(0.985 0 0);
+}
+
+.dark .explanation-content :where(tr:nth-child(even)) {
+  background: oklch(0.17 0 0);
+}
+
 /* Wolfram Alpha pod styling */
 .wolfram-pod {
   transition: all 0.2s ease;
