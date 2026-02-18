@@ -193,12 +193,14 @@ export async function POST(req: Request) {
             if (currentSectionCount > lastSectionCount) {
               lastSectionCount = currentSectionCount
               const elapsed = Date.now() - llmStartTime
-              send("status", {
+              let debugObj: any = {
                 message: `${modelName} is parsing...`,
                 detail: `Extracted ${currentSectionCount} section${currentSectionCount !== 1 ? 's' : ''} so far (${Math.round(elapsed / 1000)}s elapsed)`,
                 model: `${modelName} (${selectedModel})`,
                 prompt: PARSE_PAPER_PROMPT,
-              })
+              };
+              console.log(debugObj)
+              send("status", debugObj)
             }
           }
 
