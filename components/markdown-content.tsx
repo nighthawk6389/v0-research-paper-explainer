@@ -4,8 +4,6 @@ import { useMemo } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
-// TODO: Re-enable after remark-gfm is installed
-// import remarkGfm from "remark-gfm"
 
 interface MarkdownContentProps {
   content: string

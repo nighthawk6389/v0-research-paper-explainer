@@ -206,6 +206,8 @@ export async function POST(req: Request) {
         const llmDuration = Date.now() - llmStartTime
         console.log("[v0] LLM parse completed", {
           duration: `${llmDuration}ms`,
+          hasOutput: !!output,
+          outputType: typeof output,
           sectionsFound: output?.sections?.length,
         })
 
@@ -219,12 +221,33 @@ export async function POST(req: Request) {
           return
         }
 
+        // Validate output structure
+        console.log("[v0] Validating output structure", {
+          hasTitle: !!output.title,
+          hasSections: !!output.sections,
+          sectionsType: Array.isArray(output.sections) ? "array" : typeof output.sections,
+          sectionsLength: Array.isArray(output.sections) ? output.sections.length : "N/A",
+        })
+
+        if (!Array.isArray(output.sections)) {
+          console.error("[v0] Parse failed: sections is not an array", {
+            sectionsType: typeof output.sections,
+            sectionsValue: JSON.stringify(output.sections).substring(0, 100),
+          })
+          send("error", {
+            error: "Failed to parse the paper. Invalid section structure.",
+          })
+          close()
+          return
+        }
+
         const totalDuration = Date.now() - startTime
         console.log("[v0] Parse paper request completed successfully", {
           totalDuration: `${totalDuration}ms`,
           llmDuration: `${llmDuration}ms`,
           sections: output.sections.length,
           title: output.title,
+          firstSectionId: output.sections[0]?.id,
         })
 
         send("complete", { paper: output })

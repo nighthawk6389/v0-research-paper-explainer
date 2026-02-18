@@ -85,9 +85,21 @@ export function ExplanationModal({
 
   const sectionContentText = section ? buildSectionContentText(section) : ""
 
+  console.log("[v0] ExplanationModal rendered", {
+    hasSection: !!section,
+    sectionId: section?.id,
+    sectionHeading: section?.heading,
+    contentLength: sectionContentText.length,
+    allSectionsCount: allSections?.length,
+  })
+
   const previousSectionsContext = useMemo(() => {
     if (!section) return ""
-    const sectionIndex = allSections.findIndex((s) => s.id === section.id)
+    const sectionIndex = allSections?.findIndex((s) => s.id === section.id) ?? -1
+    console.log("[v0] Computing previous sections context", {
+      sectionIndex,
+      allSectionsLength: allSections?.length,
+    })
     if (sectionIndex <= 0) return ""
     const prevSections = allSections.slice(
       Math.max(0, sectionIndex - 3),
