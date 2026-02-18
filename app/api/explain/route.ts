@@ -4,6 +4,8 @@ import { buildExplainSystemPrompt, type DifficultyLevel } from "@/lib/prompts"
 export const maxDuration = 300
 
 export async function POST(req: Request) {
+  const startTime = Date.now()
+  
   const {
     messages,
     paperTitle,
@@ -24,6 +26,16 @@ export async function POST(req: Request) {
     model?: string
   } = await req.json()
 
+  console.log("[v0] Explain request started", {
+    paperTitle,
+    sectionHeading,
+    difficultyLevel: difficultyLevel || "advanced",
+    messageCount: messages.length,
+    hasPreviousContext: !!previousSectionsContext,
+    requestedModel: model,
+    timestamp: new Date().toISOString(),
+  })
+
   const systemPrompt = buildExplainSystemPrompt(
     paperTitle,
     paperAbstract || "",
@@ -34,16 +46,30 @@ export async function POST(req: Request) {
   )
 
   const selectedModel = model || "anthropic/claude-sonnet-4.5"
+  console.log("[v0] Using model:", selectedModel)
 
-  const result = streamText({
-    model: selectedModel,
-    system: systemPrompt,
-    messages: await convertToModelMessages(messages),
-    abortSignal: req.signal,
-  })
+  try {
+    const result = streamText({
+      model: selectedModel,
+      system: systemPrompt,
+      messages: await convertToModelMessages(messages),
+      abortSignal: req.signal,
+    })
 
-  return result.toUIMessageStreamResponse({
-    originalMessages: messages,
-    consumeSseStream: consumeStream,
-  })
+    console.log("[v0] Explain stream started", {
+      duration: `${Date.now() - startTime}ms`,
+    })
+
+    return result.toUIMessageStreamResponse({
+      originalMessages: messages,
+      consumeSseStream: consumeStream,
+    })
+  } catch (error) {
+    console.error("[v0] Explain error:", {
+      error,
+      duration: `${Date.now() - startTime}ms`,
+      message: error instanceof Error ? error.message : "Unknown error",
+    })
+    throw error
+  }
 }
