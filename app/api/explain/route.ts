@@ -1,8 +1,8 @@
 import { consumeStream, convertToModelMessages, streamText, UIMessage } from "ai"
 import { buildExplainSystemPrompt, type DifficultyLevel } from "@/lib/prompts"
-import { API_CONFIG } from "@/lib/config"
+import { MAX_DURATION } from "@/lib/config"
 
-export const maxDuration = API_CONFIG.MAX_DURATION
+export const maxDuration = MAX_DURATION
 
 export async function POST(req: Request) {
   const startTime = Date.now()
