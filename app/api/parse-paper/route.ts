@@ -1,8 +1,9 @@
-import { generateText, Output } from "ai"
+import { streamObject, generateText, Output } from "ai"
 import { paperSchema } from "@/lib/paper-schema"
 import { PARSE_PAPER_PROMPT } from "@/lib/prompts"
+import { API_CONFIG } from "@/lib/config"
 
-export const maxDuration = 300
+export const maxDuration = API_CONFIG.MAX_DURATION
 
 // Helper to create SSE encoder
 function createSSEStream() {
@@ -153,16 +154,15 @@ export async function POST(req: Request) {
           detail:
             "Scanning every equation, figure caption, and footnote (even the boring ones) • Sent 2000+ word prompt explaining what we need",
           model: `${modelName} (${selectedModel})`,
+          prompt: PARSE_PAPER_PROMPT,
         })
 
-        console.log("[v0] Starting LLM parse with model:", selectedModel)
+        console.log("[v0] Starting LLM parse with streaming structured output:", selectedModel)
         const llmStartTime = Date.now()
         
-        const { output } = await generateText({
+        const result = streamObject({
           model: selectedModel,
-          output: Output.object({
-            schema: paperSchema,
-          }),
+          schema: paperSchema,
           messages: [
             {
               role: "user",
@@ -181,6 +181,28 @@ export async function POST(req: Request) {
             },
           ],
         })
+
+        let lastSectionCount = 0
+        
+        // Stream partial results as they arrive
+        for await (const partialObject of result.partialObjectStream) {
+          const currentSectionCount = partialObject?.sections?.length || 0
+          
+          // Send progress updates when new sections are parsed
+          if (currentSectionCount > lastSectionCount) {
+            lastSectionCount = currentSectionCount
+            const elapsed = Date.now() - llmStartTime
+            send("status", {
+              message: `${modelName} is parsing...`,
+              detail: `Extracted ${currentSectionCount} section${currentSectionCount !== 1 ? 's' : ''} so far (${Math.round(elapsed / 1000)}s elapsed)`,
+              model: `${modelName} (${selectedModel})`,
+              prompt: PARSE_PAPER_PROMPT,
+            })
+          }
+        }
+
+        // Wait for final output
+        const { object: output } = await result
 
         const llmDuration = Date.now() - llmStartTime
         console.log("[v0] LLM parse completed", {
