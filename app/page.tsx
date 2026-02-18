@@ -5,6 +5,7 @@ import { PaperUploadBar } from "@/components/paper-upload-bar"
 import { PdfViewer } from "@/components/pdf-viewer"
 import { StructuredView } from "@/components/structured-view"
 import { ExplanationModal } from "@/components/explanation-modal"
+import { DeepDiveModal } from "@/components/deep-dive-modal"
 import { PaperLoading } from "@/components/paper-loading"
 import { PaperEmptyState } from "@/components/paper-empty-state"
 import {
@@ -25,6 +26,9 @@ export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showUploadHint, setShowUploadHint] = useState(false)
+  const [deepDiveLatex, setDeepDiveLatex] = useState<string | null>(null)
+  const [deepDiveSection, setDeepDiveSection] = useState<Section | null>(null)
+  const [isDeepDiveOpen, setIsDeepDiveOpen] = useState(false)
   const [loadingStatus, setLoadingStatus] = useState<{
     message: string
     detail?: string
@@ -144,6 +148,31 @@ export default function Home() {
     setTimeout(() => setSelectedSection(null), 300)
   }, [])
 
+  const handleDeepDive = useCallback((latex: string, section: Section) => {
+    setDeepDiveLatex(latex)
+    setDeepDiveSection(section)
+    setIsDeepDiveOpen(true)
+  }, [])
+
+  const handleDeepDiveClose = useCallback(() => {
+    setIsDeepDiveOpen(false)
+    setTimeout(() => {
+      setDeepDiveLatex(null)
+      setDeepDiveSection(null)
+    }, 300)
+  }, [])
+
+  // Build section context text for deep dive
+  const deepDiveSectionContext = useMemo(() => {
+    if (!deepDiveSection) return ""
+    return deepDiveSection.content
+      .map((block) => {
+        if (block.type === "math") return `$$${block.value}$$`
+        return block.value
+      })
+      .join("\n\n")
+  }, [deepDiveSection])
+
   const hasPaper = paper !== null
 
   return (
@@ -175,6 +204,7 @@ export default function Home() {
                 hoveredSection={hoveredSection}
                 onSectionHover={setHoveredSection}
                 onSectionClick={handleSectionClick}
+                onDeepDive={handleDeepDive}
               />
             </ResizablePanel>
           </ResizablePanelGroup>
@@ -186,6 +216,14 @@ export default function Home() {
         paperTitle={paper?.title || ""}
         isOpen={isModalOpen}
         onClose={handleModalClose}
+      />
+
+      <DeepDiveModal
+        latex={deepDiveLatex}
+        sectionContext={deepDiveSectionContext}
+        paperTitle={paper?.title || ""}
+        isOpen={isDeepDiveOpen}
+        onClose={handleDeepDiveClose}
       />
 
       {/* Error banner */}
