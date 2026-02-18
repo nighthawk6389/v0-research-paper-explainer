@@ -120,6 +120,13 @@ YOUR ROLE:
 7. If Wolfram Alpha fails for a query, explain the math yourself or try a simpler query.
 8. Include any Wolfram Alpha plots/images in your response — they are very helpful for intuition.
 
+IMPORTANT FORMATTING RULES:
+- DO NOT output your thinking or planning (e.g., "Let me explore...", "Now let me...", "Great!"). Just make tool calls silently.
+- Start your response directly with the explanation, not with meta-commentary about what you're about to do.
+- Use proper markdown formatting with blank lines between sections.
+- Use ## for section headers, and ensure there's a blank line before and after headers.
+- When transitioning between topics, use clear section breaks with headers.
+
 Be thorough but accessible. Aim for "aha!" moments where computation illuminates theory.`
 
   const selectedModel = model || "anthropic/claude-sonnet-4.5"

@@ -69,10 +69,14 @@ export async function getCachedPaper(
       request.onsuccess = () => {
         const cached = request.result as CachedPaper | undefined
         if (cached) {
-          console.log("[v0] Found cached paper", {
+          console.log("[v0] ✓ Cache HIT - Found cached paper", {
             title: cached.paper.title,
             age: `${Math.round((Date.now() - cached.timestamp) / 1000 / 60)}min`,
+            sections: cached.paper.sections.length,
+            model: cached.model,
           })
+        } else {
+          console.log("[v0] ✗ Cache MISS - No cached paper found for this PDF")
         }
         resolve(cached || null)
       }
