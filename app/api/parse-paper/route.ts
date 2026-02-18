@@ -2,7 +2,7 @@ import { generateText, Output } from "ai"
 import { paperSchema } from "@/lib/paper-schema"
 import { PARSE_PAPER_PROMPT } from "@/lib/prompts"
 
-export const maxDuration = 60
+export const maxDuration = 300
 
 // Helper to create SSE encoder
 function createSSEStream() {
@@ -35,10 +35,19 @@ export async function POST(req: Request) {
 
     // Process in background
     ;(async () => {
+      const startTime = Date.now()
       try {
         const { pdfBase64, url: pdfUrl, model } = await req.json()
+        console.log("[v0] Parse paper request started", {
+          hasBase64: !!pdfBase64,
+          hasUrl: !!pdfUrl,
+          requestedModel: model,
+          timestamp: new Date().toISOString(),
+        })
+        
         let pdfData: string = pdfBase64
         const selectedModel = model || "anthropic/claude-sonnet-4.5"
+        console.log("[v0] Using model:", selectedModel)
         
         const modelDisplayNames: Record<string, string> = {
           "anthropic/claude-sonnet-4.5": "Claude Sonnet 4.5",
@@ -55,6 +64,7 @@ export async function POST(req: Request) {
 
         // If URL provided, fetch the PDF
         if (pdfUrl && !pdfBase64) {
+          console.log("[v0] Fetching PDF from URL:", pdfUrl)
           try {
             const response = await fetch(pdfUrl, {
               headers: {
@@ -146,6 +156,9 @@ export async function POST(req: Request) {
             "Scanning every equation, figure caption, and footnote (even the boring ones)",
         })
 
+        console.log("[v0] Starting LLM parse with model:", selectedModel)
+        const llmStartTime = Date.now()
+        
         const { output } = await generateText({
           model: selectedModel,
           output: Output.object({
@@ -170,7 +183,14 @@ export async function POST(req: Request) {
           ],
         })
 
+        const llmDuration = Date.now() - llmStartTime
+        console.log("[v0] LLM parse completed", {
+          duration: `${llmDuration}ms`,
+          sectionsFound: output?.sections?.length,
+        })
+
         if (!output) {
+          console.log("[v0] Parse failed: No structured output returned")
           send("error", {
             error:
               "Failed to parse the paper. The LLM did not return structured output.",
@@ -179,10 +199,23 @@ export async function POST(req: Request) {
           return
         }
 
+        const totalDuration = Date.now() - startTime
+        console.log("[v0] Parse paper request completed successfully", {
+          totalDuration: `${totalDuration}ms`,
+          llmDuration: `${llmDuration}ms`,
+          sections: output.sections.length,
+          title: output.title,
+        })
+
         send("complete", { paper: output })
         close()
       } catch (error) {
-        console.error("Parse paper error:", error)
+        const totalDuration = Date.now() - startTime
+        console.error("[v0] Parse paper error:", {
+          error,
+          duration: `${totalDuration}ms`,
+          message: error instanceof Error ? error.message : "Unknown error",
+        })
         const message =
           error instanceof Error ? error.message : "Unknown error occurred"
         send("error", { error: message })

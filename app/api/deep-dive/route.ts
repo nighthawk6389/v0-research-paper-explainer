@@ -12,9 +12,11 @@ import {
   formatWolframResultAsMarkdown,
 } from "@/lib/wolfram-alpha"
 
-export const maxDuration = 60
+export const maxDuration = 300
 
 export async function POST(req: Request) {
+  const startTime = Date.now()
+  
   const {
     messages,
     latex,
@@ -28,6 +30,14 @@ export async function POST(req: Request) {
     paperTitle: string
     model?: string
   } = await req.json()
+
+  console.log("[v0] Deep-dive request started", {
+    paperTitle,
+    latexPreview: latex.substring(0, 100) + (latex.length > 100 ? "..." : ""),
+    messageCount: messages.length,
+    requestedModel: model,
+    timestamp: new Date().toISOString(),
+  })
 
   const wolframAlphaTool = tool({
     description:
@@ -45,7 +55,19 @@ export async function POST(req: Request) {
         ),
     }),
     execute: async ({ query, purpose }) => {
+      console.log("[v0] Wolfram Alpha query:", { query, purpose })
+      const wolframStartTime = Date.now()
+      
       const result = await queryWolframAlpha(query)
+      
+      console.log("[v0] Wolfram Alpha result:", {
+        query,
+        success: result.success,
+        duration: `${Date.now() - wolframStartTime}ms`,
+        podCount: result.pods.length,
+        hasError: !!result.error,
+      })
+      
       return {
         query,
         purpose,
@@ -100,20 +122,34 @@ YOUR ROLE:
 Be thorough but accessible. Aim for "aha!" moments where computation illuminates theory.`
 
   const selectedModel = model || "anthropic/claude-sonnet-4.5"
+  console.log("[v0] Using model:", selectedModel)
 
-  const result = streamText({
-    model: selectedModel,
-    system: systemPrompt,
-    messages: await convertToModelMessages(messages),
-    tools: {
-      wolframAlpha: wolframAlphaTool,
-    },
-    stopWhen: stepCountIs(8),
-    abortSignal: req.signal,
-  })
+  try {
+    const result = streamText({
+      model: selectedModel,
+      system: systemPrompt,
+      messages: await convertToModelMessages(messages),
+      tools: {
+        wolframAlpha: wolframAlphaTool,
+      },
+      stopWhen: stepCountIs(8),
+      abortSignal: req.signal,
+    })
 
-  return result.toUIMessageStreamResponse({
-    originalMessages: messages,
-    consumeSseStream: consumeStream,
-  })
+    console.log("[v0] Deep-dive stream started", {
+      duration: `${Date.now() - startTime}ms`,
+    })
+
+    return result.toUIMessageStreamResponse({
+      originalMessages: messages,
+      consumeSseStream: consumeStream,
+    })
+  } catch (error) {
+    console.error("[v0] Deep-dive error:", {
+      error,
+      duration: `${Date.now() - startTime}ms`,
+      message: error instanceof Error ? error.message : "Unknown error",
+    })
+    throw error
+  }
 }
