@@ -76,6 +76,11 @@ export function ExplanationModal({
       .join("\n\n")
   }, [section, allSections])
 
+  // Use a stable ID that doesn't change during render
+  const stableId = useMemo(() => {
+    return `explain-${Date.now()}-${Math.random()}`
+  }, [])
+
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -97,7 +102,7 @@ export function ExplanationModal({
   )
 
   const { messages, sendMessage, status, setMessages } = useChat({
-    id: section?.id || "default",
+    id: stableId,
     transport,
   })
 
