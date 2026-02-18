@@ -11,6 +11,7 @@ interface StructuredViewProps {
   hoveredSection: string | null
   onSectionHover: (sectionId: string | null) => void
   onSectionClick: (section: Section) => void
+  onDeepDive?: (latex: string, section: Section) => void
 }
 
 export function StructuredView({
@@ -18,6 +19,7 @@ export function StructuredView({
   hoveredSection,
   onSectionHover,
   onSectionClick,
+  onDeepDive,
 }: StructuredViewProps) {
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
@@ -95,6 +97,7 @@ export function StructuredView({
                 isHovered={hoveredSection === section.id}
                 onHover={onSectionHover}
                 onClick={onSectionClick}
+                onDeepDive={onDeepDive}
               />
             </div>
           ))}

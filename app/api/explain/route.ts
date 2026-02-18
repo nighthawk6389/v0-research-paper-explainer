@@ -7,26 +7,36 @@ export async function POST(req: Request) {
   const {
     messages,
     paperTitle,
+    paperAbstract,
     sectionHeading,
     sectionContent,
+    previousSectionsContext,
     difficultyLevel,
+    model,
   }: {
     messages: UIMessage[]
     paperTitle: string
+    paperAbstract?: string
     sectionHeading: string
     sectionContent: string
+    previousSectionsContext?: string
     difficultyLevel?: DifficultyLevel
+    model?: string
   } = await req.json()
 
   const systemPrompt = buildExplainSystemPrompt(
     paperTitle,
+    paperAbstract || "",
     sectionHeading,
     sectionContent,
+    previousSectionsContext || "",
     difficultyLevel || "advanced"
   )
 
+  const selectedModel = model || "anthropic/claude-sonnet-4.5"
+
   const result = streamText({
-    model: "anthropic/claude-sonnet-4-20250514",
+    model: selectedModel,
     system: systemPrompt,
     messages: await convertToModelMessages(messages),
     abortSignal: req.signal,

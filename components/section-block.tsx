@@ -10,6 +10,7 @@ interface SectionBlockProps {
   isHovered: boolean
   onHover: (sectionId: string | null) => void
   onClick: (section: Section) => void
+  onDeepDive?: (latex: string, section: Section) => void
 }
 
 function renderTextWithInlineMath(text: string) {
@@ -27,6 +28,7 @@ export function SectionBlock({
   isHovered,
   onHover,
   onClick,
+  onDeepDive,
 }: SectionBlockProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -127,6 +129,11 @@ export function SectionBlock({
                   latex={block.value}
                   displayMode={!block.isInline}
                   label={block.label}
+                  onDeepDive={
+                    onDeepDive && !block.isInline
+                      ? (latex) => onDeepDive(latex, section)
+                      : undefined
+                  }
                 />
               )
             }
