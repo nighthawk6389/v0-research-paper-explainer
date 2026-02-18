@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef } from "react"
+import { useCallback, useMemo, useRef } from "react"
 import { SectionBlock } from "@/components/section-block"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { BookOpen } from "lucide-react"
@@ -28,6 +28,21 @@ export function StructuredView({
     }
   }, [])
 
+  // Extract unique top-level section headings for the TOC
+  // Sections use "Original Title — Sub-topic" pattern, so we extract the base title
+  const tocEntries = useMemo(() => {
+    const seen = new Set<string>()
+    const entries: { label: string; sectionId: string }[] = []
+    for (const section of paper.sections) {
+      const baseHeading = section.heading.split(" — ")[0].split(" - ")[0].trim()
+      if (!seen.has(baseHeading)) {
+        seen.add(baseHeading)
+        entries.push({ label: baseHeading, sectionId: section.id })
+      }
+    }
+    return entries
+  }, [paper.sections])
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Paper header */}
@@ -38,10 +53,13 @@ export function StructuredView({
         <p className="text-xs text-muted-foreground mt-1">
           {paper.authors.join(", ")}
         </p>
+        <p className="text-[10px] text-muted-foreground mt-1">
+          {paper.sections.length} sections extracted
+        </p>
       </div>
 
       {/* Table of contents */}
-      <div className="px-4 py-2 border-b bg-muted/30 shrink-0 max-h-24 overflow-y-auto">
+      <div className="px-4 py-2 border-b bg-muted/30 shrink-0 max-h-28 overflow-y-auto">
         <div className="flex items-center gap-1.5 mb-1.5">
           <BookOpen className="size-3.5 text-muted-foreground" />
           <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
@@ -49,13 +67,13 @@ export function StructuredView({
           </span>
         </div>
         <nav className="flex flex-wrap gap-x-3 gap-y-1">
-          {paper.sections.map((section) => (
+          {tocEntries.map((entry) => (
             <button
-              key={section.id}
-              onClick={() => scrollToSection(section.id)}
+              key={entry.sectionId}
+              onClick={() => scrollToSection(entry.sectionId)}
               className="text-xs text-muted-foreground hover:text-foreground transition-colors truncate max-w-48"
             >
-              {section.heading}
+              {entry.label}
             </button>
           ))}
         </nav>

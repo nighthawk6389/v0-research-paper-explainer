@@ -1,26 +1,45 @@
 export const PARSE_PAPER_PROMPT = `You are a research paper parser. Your job is to read the attached PDF and extract a structured representation of its content.
 
+CRITICAL RULE — GRANULAR SECTIONS:
+You MUST break the paper into PARAGRAPH-LEVEL chunks, not just top-level sections. Each paragraph or small group of closely related paragraphs should be its own section. This allows readers to click on individual paragraphs for explanations.
+
+For example, if section "3. Methodology" has 4 paragraphs and 2 equations, you should produce roughly 4-6 sections from it:
+  - "3. Methodology" (the introductory paragraph)
+  - "3. Methodology — Data Preprocessing" (second paragraph about data)
+  - "3. Methodology — Loss Function" (paragraph introducing the loss function)
+  - "3. Methodology — Eq. (4): Cross-Entropy Loss" (the equation block with surrounding context)
+  - "3. Methodology — Optimization" (paragraph about optimizer choice)
+  - etc.
+
+Use the pattern: "Original Section Title — Short Descriptor" for sub-chunks.
+If a paragraph is very short (1-2 sentences), you may group it with the next paragraph.
+
 RULES:
 1. Extract the paper title, author names, and the full abstract.
-2. Extract every section that appears BETWEEN the abstract and the references/bibliography section. 
+2. Extract content that appears BETWEEN the abstract and the references/bibliography section.
    - Do NOT include anything before the abstract (title page headers, author affiliations, etc.)
    - Do NOT include the references/bibliography section itself
    - DO include the conclusion/summary if it appears before references
-3. For each section, preserve the heading exactly as written (e.g., "3. Methodology", "4.1 Loss Function").
-4. Break each section into content blocks:
-   - "text" blocks: prose paragraphs. Keep them as complete paragraphs, not individual sentences.
+3. For each section chunk, create a clear heading:
+   - For top-level section intros: use the heading as-is (e.g., "3. Methodology")
+   - For sub-paragraphs: use "Section Title — Topic" format (e.g., "3. Methodology — Regularization")
+   - For equations: use "Section Title — Eq. (N): Description" if numbered
+4. Break each section chunk into content blocks:
+   - "text" blocks: prose paragraphs. Keep them as complete paragraphs.
    - "math" blocks: mathematical equations and formulas. These MUST be valid LaTeX.
-     - For display/block equations: set isInline to false. These are typically centered, numbered equations.
-     - For inline math within a text block: You can include inline math by setting isInline to true, OR keep it embedded in the text block using $...$ delimiters.
+     - For display/block equations: set isInline to false.
+     - For inline math within a text block: embed it using $...$ delimiters within the text.
 5. CRITICAL for math extraction:
    - Keep equations as COMPLETE expressions. Never break "E = mc^2" into individual symbols.
    - Preserve equation numbers/labels like "(1)", "(2)" in the label field.
    - Use standard LaTeX notation: \\frac{}{}, \\sum_{}, \\int_{}, \\alpha, \\beta, etc.
    - Multi-line equations (align environments) should stay as one block.
    - Matrices, systems of equations, and piecewise functions should stay as single blocks.
-6. Page numbers: note which page(s) each section spans (1-indexed).
-7. The section id should be sequential: "section-0" for the abstract section, "section-1", "section-2", etc.
+6. Page numbers: note which page(s) each section chunk spans (1-indexed).
+7. The section id should be sequential: "section-0", "section-1", "section-2", etc.
 8. Include the abstract as the first section with id "section-0" and heading "Abstract".
+
+AIM for roughly 1-3 paragraphs per section chunk. A 10-page paper should produce roughly 30-60 section chunks.
 
 Return valid JSON matching the schema. Do not include any markdown formatting or code fences in your response.`
 

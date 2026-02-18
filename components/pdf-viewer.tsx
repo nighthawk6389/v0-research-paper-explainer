@@ -136,27 +136,40 @@ export function PdfViewer({ pdfData, pdfUrl, highlightedPage }: PdfViewerProps) 
             }
           >
             {Array.from({ length: numPages }, (_, i) => i + 1).map(
-              (pageNum) => (
-                <div
-                  key={pageNum}
-                  ref={(el) => {
-                    pageRefs.current[pageNum] = el
-                  }}
-                  className={`mb-4 shadow-sm rounded transition-all ${
-                    highlightedPage === pageNum
-                      ? "ring-2 ring-foreground/20 ring-offset-2"
-                      : ""
-                  }`}
-                >
-                  <Page
-                    pageNumber={pageNum}
-                    scale={scale}
-                    loading={<Skeleton className="h-96 w-[500px]" />}
-                    renderTextLayer={true}
-                    renderAnnotationLayer={true}
-                  />
-                </div>
-              )
+              (pageNum) => {
+                const isHighlighted = highlightedPage === pageNum
+                return (
+                  <div
+                    key={pageNum}
+                    ref={(el) => {
+                      pageRefs.current[pageNum] = el
+                    }}
+                    className="mb-4 relative"
+                  >
+                    {/* Highlight overlay */}
+                    {isHighlighted && (
+                      <div className="absolute inset-0 z-10 pointer-events-none rounded ring-2 ring-blue-500 ring-offset-2 bg-blue-500/5" />
+                    )}
+                    <div
+                      className={`shadow-sm rounded transition-shadow duration-200 ${
+                        isHighlighted ? "shadow-lg shadow-blue-500/20" : ""
+                      }`}
+                    >
+                      <Page
+                        pageNumber={pageNum}
+                        scale={scale}
+                        loading={<Skeleton className="h-96 w-[500px]" />}
+                        renderTextLayer={true}
+                        renderAnnotationLayer={true}
+                      />
+                    </div>
+                    {/* Page label */}
+                    <div className={`text-center mt-1 text-[10px] transition-colors ${isHighlighted ? "text-blue-600 font-medium" : "text-muted-foreground"}`}>
+                      Page {pageNum}
+                    </div>
+                  </div>
+                )
+              }
             )}
           </Document>
         </div>

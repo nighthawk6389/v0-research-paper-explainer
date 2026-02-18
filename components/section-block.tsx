@@ -1,8 +1,8 @@
 "use client"
 
-import { useCallback } from "react"
+import { useState, useCallback } from "react"
 import { MathBlock } from "@/components/math-block"
-import { Lightbulb } from "lucide-react"
+import { Lightbulb, ChevronRight } from "lucide-react"
 import type { Section } from "@/lib/paper-schema"
 
 interface SectionBlockProps {
@@ -13,11 +13,9 @@ interface SectionBlockProps {
 }
 
 function renderTextWithInlineMath(text: string) {
-  // Split on $...$ for inline math but not $$...$$
   const parts = text.split(/(?<!\$)\$(?!\$)(.*?)(?<!\$)\$(?!\$)/g)
   return parts.map((part, i) => {
     if (i % 2 === 1) {
-      // Odd indices are math content
       return <MathBlock key={i} latex={part} displayMode={false} />
     }
     return <span key={i}>{part}</span>
@@ -30,6 +28,8 @@ export function SectionBlock({
   onHover,
   onClick,
 }: SectionBlockProps) {
+  const [isExpanded, setIsExpanded] = useState(false)
+
   const handleClick = useCallback(() => {
     onClick(section)
   }, [section, onClick])
@@ -42,13 +42,24 @@ export function SectionBlock({
     onHover(null)
   }, [onHover])
 
+  const toggleExpand = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    setIsExpanded((prev) => !prev)
+  }, [])
+
+  // Get a short preview: first text block, truncated
+  const previewText = section.content.find((b) => b.type === "text")?.value || ""
+  const hasMath = section.content.some((b) => b.type === "math")
+  const truncatedPreview =
+    previewText.length > 120 ? previewText.slice(0, 120) + "..." : previewText
+
   return (
     <div
       role="button"
       tabIndex={0}
-      className={`group relative rounded-lg border p-4 transition-all cursor-pointer ${
+      className={`group relative rounded-lg border transition-all cursor-pointer ${
         isHovered
-          ? "border-foreground/30 bg-accent/50 shadow-sm"
+          ? "border-blue-400/50 bg-blue-50/50 dark:bg-blue-950/20 shadow-sm"
           : "border-transparent hover:border-border hover:bg-accent/30"
       }`}
       onMouseEnter={handleMouseEnter}
@@ -61,57 +72,72 @@ export function SectionBlock({
         }
       }}
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <h3 className="font-semibold text-sm text-foreground leading-tight">
+      {/* Compact header row */}
+      <div className="flex items-center gap-2 px-3 py-2">
+        <button
+          onClick={toggleExpand}
+          className="shrink-0 p-0.5 rounded hover:bg-accent transition-colors"
+          aria-label={isExpanded ? "Collapse section" : "Expand section"}
+        >
+          <ChevronRight
+            className={`size-3.5 text-muted-foreground transition-transform duration-150 ${
+              isExpanded ? "rotate-90" : ""
+            }`}
+          />
+        </button>
+        <h3 className="font-medium text-[13px] text-foreground leading-tight flex-1 min-w-0 truncate">
           {section.heading}
         </h3>
-        <div
-          className={`shrink-0 flex items-center gap-1 text-xs transition-opacity ${
-            isHovered ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-          }`}
-        >
-          <Lightbulb className="size-3.5" />
-          <span className="text-muted-foreground">Explain</span>
+        <div className="shrink-0 flex items-center gap-1.5">
+          {hasMath && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-300">
+              Math
+            </span>
+          )}
+          <span className="text-[10px] text-muted-foreground">
+            p.{section.pageNumbers[0]}
+          </span>
+          <div
+            className={`flex items-center gap-0.5 text-xs transition-opacity ${
+              isHovered ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+            }`}
+          >
+            <Lightbulb className="size-3" />
+          </div>
         </div>
       </div>
 
-      <div className="space-y-2 text-sm leading-relaxed text-foreground/80">
-        {section.content.map((block, idx) => {
-          if (block.type === "math") {
-            return (
-              <MathBlock
-                key={idx}
-                latex={block.value}
-                displayMode={!block.isInline}
-                label={block.label}
-              />
-            )
-          }
-          return (
-            <p key={idx} className="text-pretty">
-              {renderTextWithInlineMath(block.value)}
-            </p>
-          )
-        })}
-      </div>
+      {/* Preview line (collapsed) */}
+      {!isExpanded && truncatedPreview && (
+        <div className="px-3 pb-2 pl-8">
+          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+            {truncatedPreview}
+          </p>
+        </div>
+      )}
 
-      <div className="mt-2 flex items-center gap-2">
-        {section.type === "math" && (
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-            Math
-          </span>
-        )}
-        {section.type === "mixed" && (
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-            Mixed
-          </span>
-        )}
-        <span className="text-[10px] text-muted-foreground">
-          {section.pageNumbers.length === 1
-            ? `p. ${section.pageNumbers[0]}`
-            : `pp. ${section.pageNumbers[0]}-${section.pageNumbers[section.pageNumbers.length - 1]}`}
-        </span>
-      </div>
+      {/* Full content (expanded) */}
+      {isExpanded && (
+        <div className="px-3 pb-3 pl-8 space-y-2 text-sm leading-relaxed text-foreground/80">
+          {section.content.map((block, idx) => {
+            if (block.type === "math") {
+              return (
+                <MathBlock
+                  key={idx}
+                  latex={block.value}
+                  displayMode={!block.isInline}
+                  label={block.label}
+                />
+              )
+            }
+            return (
+              <p key={idx} className="text-pretty text-xs">
+                {renderTextWithInlineMath(block.value)}
+              </p>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
