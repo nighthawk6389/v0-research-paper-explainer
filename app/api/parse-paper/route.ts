@@ -230,9 +230,10 @@ export async function POST(req: Request) {
         })
 
         if (!Array.isArray(output.sections)) {
+          const sectionsStr = output.sections ? JSON.stringify(output.sections).substring(0, 100) : "undefined"
           console.error("[v0] Parse failed: sections is not an array", {
             sectionsType: typeof output.sections,
-            sectionsValue: JSON.stringify(output.sections).substring(0, 100),
+            sectionsValue: sectionsStr,
           })
           send("error", {
             error: "Failed to parse the paper. Invalid section structure.",
