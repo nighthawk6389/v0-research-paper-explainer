@@ -143,9 +143,7 @@ export async function POST(req: Request) {
 
         send("status", {
           message: `Asking ${modelName} very nicely...`,
-          detail:
-            "Sending PDF with a 2000+ word prompt explaining what we need",
-          model: `${modelName} (${selectedModel})`,
+          detail: "Preparing the PDF and instructions",
         })
 
         await new Promise((r) => setTimeout(r, 300))
@@ -153,7 +151,8 @@ export async function POST(req: Request) {
         send("status", {
           message: `${modelName} is reading...`,
           detail:
-            "Scanning every equation, figure caption, and footnote (even the boring ones)",
+            "Scanning every equation, figure caption, and footnote (even the boring ones) • Sent 2000+ word prompt explaining what we need",
+          model: `${modelName} (${selectedModel})`,
         })
 
         console.log("[v0] Starting LLM parse with model:", selectedModel)
