@@ -97,6 +97,9 @@ export function PaperUploadBar({ onAnalyze, isLoading, showUploadHint }: PaperUp
               <SelectItem value="anthropic/claude-sonnet-4.5-20250219">
                 Claude Sonnet 4.5
               </SelectItem>
+              <SelectItem value="anthropic/claude-haiku-4.5">
+                Claude Haiku 4.5
+              </SelectItem>
               <SelectItem value="openai/gpt-4o">GPT-4o</SelectItem>
               <SelectItem value="openai/gpt-4o-mini">GPT-4o Mini</SelectItem>
               <SelectItem value="anthropic/claude-opus-4-20250514">
