@@ -48,42 +48,29 @@ export function DeepDiveModal({
     () =>
       new DefaultChatTransport({
         api: "/api/deep-dive",
-        prepareSendMessagesRequest: ({ id, messages }) => {
-          const body = {
+        prepareSendMessagesRequest: ({ id, messages }) => ({
+          body: {
             id,
             messages,
             latex: latex || "",
             sectionContext,
             paperTitle,
-          }
-          console.log("[v0] Sending deep-dive request with latex:", {
-            latexLength: (latex || "").length,
-            latexPreview: latex ? latex.substring(0, 50) : "",
-            messageCount: messages.length,
-          })
-          return { body }
-        },
+          },
+        }),
       }),
     [latex, sectionContext, paperTitle]
   )
 
-  // Use a stable ID based on initial latex value
+  // Use a stable ID based on latex hash
   const stableId = useMemo(() => {
-    return `deep-dive-${Date.now()}-${Math.random()}`
-  }, [])
+    const hash = latex ? latex.substring(0, 50).replace(/[^a-zA-Z0-9]/g, "") : "empty"
+    return `deep-dive-${hash}`
+  }, [latex])
 
   const { messages, sendMessage, status, setMessages } = useChat({
     id: stableId,
     transport,
   })
-
-  useEffect(() => {
-    console.log("[v0] Deep dive modal latex:", {
-      hasLatex: !!latex,
-      latexLength: latex?.length || 0,
-      latexPreview: latex ? latex.substring(0, 50) : "",
-    })
-  }, [latex])
 
   const isStreaming = status === "streaming" || status === "submitted"
 

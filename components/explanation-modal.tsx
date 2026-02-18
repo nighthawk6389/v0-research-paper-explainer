@@ -63,15 +63,6 @@ export function ExplanationModal({
 
   const sectionContentText = section ? buildSectionContentText(section) : ""
 
-  useEffect(() => {
-    console.log("[v0] Explanation modal content:", {
-      hasSection: !!section,
-      sectionId: section?.id,
-      contentLength: sectionContentText.length,
-      heading: section?.heading,
-    })
-  }, [section, sectionContentText])
-
   // Build context of previous sections for the LLM
   const previousSectionsContext = useMemo(() => {
     if (!section) return ""
@@ -85,17 +76,17 @@ export function ExplanationModal({
       .join("\n\n")
   }, [section, allSections])
 
-  // Use a stable ID that doesn't change during render
+  // Use a stable ID per section
   const stableId = useMemo(() => {
-    return `explain-${Date.now()}-${Math.random()}`
-  }, [])
+    return `explain-${section?.id || "default"}`
+  }, [section?.id])
 
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: "/api/explain",
-        prepareSendMessagesRequest: ({ id, messages }) => {
-          const body = {
+        prepareSendMessagesRequest: ({ id, messages }) => ({
+          body: {
             id,
             messages,
             paperTitle,
@@ -104,14 +95,8 @@ export function ExplanationModal({
             sectionContent: sectionContentText,
             previousSectionsContext,
             difficultyLevel,
-          }
-          console.log("[v0] Sending explain request with content:", {
-            contentLength: sectionContentText.length,
-            heading: section?.heading,
-            messageCount: messages.length,
-          })
-          return { body }
-        },
+          },
+        }),
       }),
     [paperTitle, paperAbstract, section?.heading, sectionContentText, previousSectionsContext, difficultyLevel]
   )
