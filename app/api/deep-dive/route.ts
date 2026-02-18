@@ -11,9 +11,8 @@ import {
   queryWolframAlpha,
   formatWolframResultAsMarkdown,
 } from "@/lib/wolfram-alpha"
-import { MAX_DURATION } from "@/lib/config"
 
-export const maxDuration = MAX_DURATION
+export const maxDuration = 600
 
 export async function POST(req: Request) {
   const startTime = Date.now()
