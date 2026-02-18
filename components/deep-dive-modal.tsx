@@ -146,7 +146,7 @@ export function DeepDiveModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0 gap-0">
+      <DialogContent className="max-w-[90vw] w-full h-[85vh] flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-5 pb-4 border-b shrink-0 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20">
           <div className="flex items-center gap-2.5">
             <div className="p-1.5 rounded-lg bg-orange-500/10">
