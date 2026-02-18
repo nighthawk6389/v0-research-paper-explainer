@@ -61,8 +61,13 @@ export function DeepDiveModal({
     [latex, sectionContext, paperTitle]
   )
 
+  // Use a stable ID based on initial latex value
+  const stableId = useMemo(() => {
+    return `deep-dive-${Date.now()}-${Math.random()}`
+  }, [])
+
   const { messages, sendMessage, status, setMessages } = useChat({
-    id: `deep-dive-${latex?.slice(0, 30) || "none"}`,
+    id: stableId,
     transport,
   })
 
