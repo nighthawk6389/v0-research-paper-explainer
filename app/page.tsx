@@ -8,6 +8,7 @@ import { ExplanationModal } from "@/components/explanation-modal"
 import { DeepDiveModal } from "@/components/deep-dive-modal"
 import { PaperLoading } from "@/components/paper-loading"
 import { PaperEmptyState } from "@/components/paper-empty-state"
+import { getCachedPaper, setCachedPaper } from "@/lib/paper-cache"
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -62,6 +63,18 @@ export default function Home() {
       }
 
       try {
+        // Check cache first
+        const cached = await getCachedPaper(data.pdfBase64, data.url)
+        if (cached) {
+          setPaper(cached.paper)
+          toast.success("Loaded from cache", {
+            description: `${cached.paper.title} - ${cached.paper.sections.length} sections`,
+          })
+          setIsLoading(false)
+          setLoadingStatus(null)
+          return
+        }
+
         // Use streaming endpoint
         const response = await fetch("/api/parse-paper?stream=true", {
           method: "POST",
@@ -100,6 +113,15 @@ export default function Home() {
                   setLoadingStatus(data)
                 } else if (event === "complete") {
                   setPaper(data.paper)
+                  
+                  // Cache the parsed paper
+                  await setCachedPaper(
+                    data.paper,
+                    data.pdfBase64 || "",
+                    data.url || null,
+                    selectedModel
+                  )
+                  
                   toast.success("Paper analyzed successfully", {
                     description: `Found ${data.paper.sections.length} sections`,
                   })
