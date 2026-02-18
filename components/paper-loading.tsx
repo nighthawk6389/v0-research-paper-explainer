@@ -1,18 +1,23 @@
 "use client"
 
+import { useState } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Loader2, Sparkles } from "lucide-react"
+import { Loader2, Sparkles, ChevronDown, ChevronRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 
 interface PaperLoadingProps {
   status?: {
     message: string
     detail?: string
     model?: string
+    prompt?: string
   }
 }
 
 export function PaperLoading({ status }: PaperLoadingProps) {
+  const [showPrompt, setShowPrompt] = useState(false)
+  
   return (
     <div className="flex h-full">
       {/* Left panel skeleton */}
@@ -41,6 +46,35 @@ export function PaperLoading({ status }: PaperLoadingProps) {
                   <Badge variant="secondary" className="text-[10px] font-normal">
                     {status.model}
                   </Badge>
+                </div>
+              )}
+              {status?.prompt && (
+                <div className="mt-3 border rounded-lg">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowPrompt(!showPrompt)}
+                    className="w-full justify-between h-auto py-2 text-xs"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      {showPrompt ? (
+                        <ChevronDown className="size-3" />
+                      ) : (
+                        <ChevronRight className="size-3" />
+                      )}
+                      View system prompt
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {status.prompt.length} chars
+                    </span>
+                  </Button>
+                  {showPrompt && (
+                    <div className="p-3 border-t bg-muted/50 max-h-[300px] overflow-y-auto">
+                      <pre className="text-[10px] leading-relaxed whitespace-pre-wrap font-mono">
+                        {status.prompt}
+                      </pre>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
