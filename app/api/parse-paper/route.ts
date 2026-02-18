@@ -1,8 +1,9 @@
 import { streamObject, generateText, Output } from "ai"
 import { paperSchema } from "@/lib/paper-schema"
 import { PARSE_PAPER_PROMPT } from "@/lib/prompts"
+import { API_CONFIG } from "@/lib/config"
 
-export const maxDuration = 300
+export const maxDuration = API_CONFIG.MAX_DURATION
 
 // Helper to create SSE encoder
 function createSSEStream() {
