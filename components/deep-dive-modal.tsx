@@ -22,6 +22,7 @@ import {
   CornerDownLeft,
   Sigma,
   ChevronRight,
+  ArrowDown,
 } from "lucide-react"
 
 interface DeepDiveModalProps {
@@ -43,6 +44,8 @@ export function DeepDiveModal({
   const scrollRef = useRef<HTMLDivElement>(null)
   const hasInitiatedRef = useRef(false)
   const currentLatexRef = useRef<string | null>(null)
+  const [isUserScrolledUp, setIsUserScrolledUp] = useState(false)
+  const [showScrollButton, setShowScrollButton] = useState(false)
 
   const transport = useMemo(
     () =>
@@ -99,15 +102,51 @@ export function DeepDiveModal({
     }
   }, [isOpen, latex, messages.length, sendMessage])
 
-  // Auto-scroll
+  // Detect when user manually scrolls up
   useEffect(() => {
     const viewport = scrollRef.current?.querySelector(
       "[data-slot='scroll-area-viewport']"
-    )
+    ) as HTMLElement | null
+    
+    if (!viewport) return
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = viewport
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight
+      const isAtBottom = distanceFromBottom < 50 // 50px threshold
+      
+      setIsUserScrolledUp(!isAtBottom)
+      setShowScrollButton(!isAtBottom && isStreaming)
+    }
+
+    viewport.addEventListener("scroll", handleScroll)
+    return () => viewport.removeEventListener("scroll", handleScroll)
+  }, [isStreaming])
+
+  // Auto-scroll only if user hasn't scrolled up
+  useEffect(() => {
+    if (isUserScrolledUp) return
+    
+    const viewport = scrollRef.current?.querySelector(
+      "[data-slot='scroll-area-viewport']"
+    ) as HTMLElement | null
+    
     if (viewport) {
       viewport.scrollTop = viewport.scrollHeight
     }
-  }, [messages])
+  }, [messages, isUserScrolledUp])
+
+  const scrollToBottom = useCallback(() => {
+    const viewport = scrollRef.current?.querySelector(
+      "[data-slot='scroll-area-viewport']"
+    ) as HTMLElement | null
+    
+    if (viewport) {
+      viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" })
+      setIsUserScrolledUp(false)
+      setShowScrollButton(false)
+    }
+  }, [])
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -170,7 +209,20 @@ export function DeepDiveModal({
         </DialogHeader>
 
         {/* Messages */}
-        <div className="flex-1 min-h-0 overflow-hidden" ref={scrollRef}>
+        <div className="flex-1 min-h-0 overflow-hidden relative" ref={scrollRef}>
+          {/* Scroll to bottom button */}
+          {showScrollButton && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
+              <Button
+                size="sm"
+                onClick={scrollToBottom}
+                className="shadow-lg h-8 px-3 gap-1.5"
+              >
+                <ArrowDown className="size-3" />
+                <span className="text-xs">New messages</span>
+              </Button>
+            </div>
+          )}
           <ScrollArea className="h-full">
             <div className="px-6 py-4 space-y-5">
               {messages.map((message, idx) => {

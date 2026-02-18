@@ -29,6 +29,7 @@ import {
   GraduationCap,
   FileText,
   MessageSquare,
+  ArrowDown,
 } from "lucide-react"
 import type { Section } from "@/lib/paper-schema"
 import type { DifficultyLevel } from "@/lib/prompts"
@@ -79,6 +80,8 @@ export function ExplanationModal({
   const currentSectionIdRef = useRef<string | null>(null)
   const currentDifficultyRef = useRef<DifficultyLevel>("advanced")
   const [expandedFormula, setExpandedFormula] = useState<string | null>(null)
+  const [isUserScrolledUp, setIsUserScrolledUp] = useState(false)
+  const [showScrollButton, setShowScrollButton] = useState(false)
 
   const sectionContentText = section ? buildSectionContentText(section) : ""
 
@@ -171,14 +174,51 @@ export function ExplanationModal({
     }
   }, [difficultyLevel, isOpen, section, setMessages])
 
+  // Detect when user manually scrolls up
   useEffect(() => {
     const viewport = scrollRef.current?.querySelector(
       "[data-slot='scroll-area-viewport']"
-    )
+    ) as HTMLElement | null
+    
+    if (!viewport) return
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = viewport
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight
+      const isAtBottom = distanceFromBottom < 50 // 50px threshold
+      
+      setIsUserScrolledUp(!isAtBottom)
+      setShowScrollButton(!isAtBottom && isStreaming)
+    }
+
+    viewport.addEventListener("scroll", handleScroll)
+    return () => viewport.removeEventListener("scroll", handleScroll)
+  }, [isStreaming])
+
+  // Auto-scroll only if user hasn't scrolled up
+  useEffect(() => {
+    if (isUserScrolledUp) return
+    
+    const viewport = scrollRef.current?.querySelector(
+      "[data-slot='scroll-area-viewport']"
+    ) as HTMLElement | null
+    
     if (viewport) {
       viewport.scrollTop = viewport.scrollHeight
     }
-  }, [messages])
+  }, [messages, isUserScrolledUp])
+
+  const scrollToBottom = useCallback(() => {
+    const viewport = scrollRef.current?.querySelector(
+      "[data-slot='scroll-area-viewport']"
+    ) as HTMLElement | null
+    
+    if (viewport) {
+      viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" })
+      setIsUserScrolledUp(false)
+      setShowScrollButton(false)
+    }
+  }, [])
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -324,9 +364,22 @@ export function ExplanationModal({
 
             {/* Chat messages */}
             <div
-              className="flex-1 min-h-0 overflow-hidden"
+              className="flex-1 min-h-0 overflow-hidden relative"
               ref={scrollRef}
             >
+              {/* Scroll to bottom button */}
+              {showScrollButton && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
+                  <Button
+                    size="sm"
+                    onClick={scrollToBottom}
+                    className="shadow-lg h-8 px-3 gap-1.5"
+                  >
+                    <ArrowDown className="size-3" />
+                    <span className="text-xs">New messages</span>
+                  </Button>
+                </div>
+              )}
               <ScrollArea className="h-full">
                 <div className="px-5 py-4 space-y-4">
                   {messages.map((message, idx) => {
