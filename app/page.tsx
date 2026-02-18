@@ -214,6 +214,8 @@ export default function Home() {
       <ExplanationModal
         section={selectedSection}
         paperTitle={paper?.title || ""}
+        paperAbstract={paper?.abstract || ""}
+        allSections={paper?.sections || []}
         isOpen={isModalOpen}
         onClose={handleModalClose}
       />

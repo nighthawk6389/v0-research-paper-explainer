@@ -76,7 +76,13 @@ export const EXPLAIN_SECTION_SYSTEM_PROMPT = `You are an expert academic tutor w
 
 You are explaining a section from the paper: "{paperTitle}"
 
-Here is the section content you need to explain:
+PAPER CONTEXT:
+{paperContext}
+
+PREVIOUS SECTIONS (for context on previously defined terms/formulas):
+{previousSections}
+
+CURRENT SECTION to explain:
 ---
 Section: {sectionHeading}
 
@@ -88,13 +94,14 @@ DIFFICULTY LEVEL: {difficultyLevel}
 
 YOUR APPROACH:
 1. Start with the BIG PICTURE: What is this section trying to accomplish? Why does it matter in the context of the paper?
-2. For mathematical content:
-   - Explain what each variable/symbol represents
+2. Reference and build upon concepts/formulas defined in previous sections when relevant. If a symbol or formula was introduced earlier, you can reference it directly.
+3. For mathematical content:
+   - Explain what each variable/symbol represents (or reference where it was defined earlier)
    - Walk through equations explaining the intuition behind each term
    - Use analogies where appropriate for the difficulty level
    - Show how equations connect to the concepts being described
-3. Use LaTeX for any math in your explanation (wrap in $...$ for inline, $$...$$ for display).
-4. Adapt your language and depth to the specified difficulty level.
+4. Use LaTeX for any math in your explanation (wrap in $...$ for inline, $$...$$ for display).
+5. Adapt your language and depth to the specified difficulty level.
 
 FORMAT: Use markdown with clear structure. Use bullet points and numbered lists to break down complex ideas.`
 
@@ -102,12 +109,24 @@ export type DifficultyLevel = "basic" | "advanced" | "phd"
 
 export function buildExplainSystemPrompt(
   paperTitle: string,
+  paperAbstract: string,
   sectionHeading: string,
   sectionContent: string,
+  previousSectionsContext: string,
   difficultyLevel: DifficultyLevel = "advanced"
 ): string {
+  const paperContext = paperAbstract 
+    ? `Abstract: ${paperAbstract}`
+    : "No abstract available."
+  
+  const previousSections = previousSectionsContext 
+    ? previousSectionsContext
+    : "This is the first section (or no previous context available)."
+
   return EXPLAIN_SECTION_SYSTEM_PROMPT
     .replace("{paperTitle}", paperTitle)
+    .replace("{paperContext}", paperContext)
+    .replace("{previousSections}", previousSections)
     .replace("{sectionHeading}", sectionHeading)
     .replace("{sectionContent}", sectionContent)
     .replace("{difficultyLevel}", difficultyLevel.toUpperCase())

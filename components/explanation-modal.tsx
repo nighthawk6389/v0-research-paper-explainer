@@ -29,6 +29,8 @@ import type { DifficultyLevel } from "@/lib/prompts"
 interface ExplanationModalProps {
   section: Section | null
   paperTitle: string
+  paperAbstract: string
+  allSections: Section[]
   isOpen: boolean
   onClose: () => void
 }
@@ -47,6 +49,8 @@ function buildSectionContentText(section: Section): string {
 export function ExplanationModal({
   section,
   paperTitle,
+  paperAbstract,
+  allSections,
   isOpen,
   onClose,
 }: ExplanationModalProps) {
@@ -59,6 +63,19 @@ export function ExplanationModal({
 
   const sectionContentText = section ? buildSectionContentText(section) : ""
 
+  // Build context of previous sections for the LLM
+  const previousSectionsContext = useMemo(() => {
+    if (!section) return ""
+    const sectionIndex = allSections.findIndex((s) => s.id === section.id)
+    if (sectionIndex <= 0) return "" // First section or not found
+    
+    // Include up to 3 previous sections for context
+    const prevSections = allSections.slice(Math.max(0, sectionIndex - 3), sectionIndex)
+    return prevSections
+      .map((s) => `## ${s.heading}\n${buildSectionContentText(s)}`)
+      .join("\n\n")
+  }, [section, allSections])
+
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -68,13 +85,15 @@ export function ExplanationModal({
             id,
             messages,
             paperTitle,
+            paperAbstract,
             sectionHeading: section?.heading || "",
             sectionContent: sectionContentText,
+            previousSectionsContext,
             difficultyLevel,
           },
         }),
       }),
-    [paperTitle, section?.heading, sectionContentText, difficultyLevel]
+    [paperTitle, paperAbstract, section?.heading, sectionContentText, previousSectionsContext, difficultyLevel]
   )
 
   const { messages, sendMessage, status, setMessages } = useChat({

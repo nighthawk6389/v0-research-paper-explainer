@@ -7,21 +7,27 @@ export async function POST(req: Request) {
   const {
     messages,
     paperTitle,
+    paperAbstract,
     sectionHeading,
     sectionContent,
+    previousSectionsContext,
     difficultyLevel,
   }: {
     messages: UIMessage[]
     paperTitle: string
+    paperAbstract?: string
     sectionHeading: string
     sectionContent: string
+    previousSectionsContext?: string
     difficultyLevel?: DifficultyLevel
   } = await req.json()
 
   const systemPrompt = buildExplainSystemPrompt(
     paperTitle,
+    paperAbstract || "",
     sectionHeading,
     sectionContent,
+    previousSectionsContext || "",
     difficultyLevel || "advanced"
   )
 
