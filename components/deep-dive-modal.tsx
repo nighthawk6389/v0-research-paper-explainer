@@ -21,7 +21,6 @@ import {
   Loader2,
   CornerDownLeft,
   Sigma,
-  ImageIcon,
   ChevronRight,
 } from "lucide-react"
 
