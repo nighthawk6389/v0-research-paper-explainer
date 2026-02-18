@@ -55,6 +55,7 @@ export function ExplanationModal({
   const scrollRef = useRef<HTMLDivElement>(null)
   const hasInitiatedRef = useRef(false)
   const currentSectionIdRef = useRef<string | null>(null)
+  const currentDifficultyRef = useRef<DifficultyLevel>("advanced")
 
   const sectionContentText = section ? buildSectionContentText(section) : ""
 
@@ -106,11 +107,26 @@ export function ExplanationModal({
       currentSectionIdRef.current === section.id
     ) {
       hasInitiatedRef.current = true
+      currentDifficultyRef.current = difficultyLevel
       sendMessage({
         text: `Please explain this section to me. Break it down so someone with college-level math can understand it.`,
       })
     }
-  }, [isOpen, section, messages.length, sendMessage])
+  }, [isOpen, section, messages.length, sendMessage, difficultyLevel])
+
+  // Regenerate explanation when difficulty level changes
+  useEffect(() => {
+    if (
+      isOpen &&
+      section &&
+      hasInitiatedRef.current &&
+      difficultyLevel !== currentDifficultyRef.current
+    ) {
+      currentDifficultyRef.current = difficultyLevel
+      setMessages([])
+      hasInitiatedRef.current = false
+    }
+  }, [difficultyLevel, isOpen, section, setMessages])
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {

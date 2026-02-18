@@ -33,11 +33,17 @@ const DIFFICULTY_INSTRUCTIONS = {
 - Using visual metaphors where possible`,
 
   advanced: `Your audience has college-level math (calculus, linear algebra, probability/statistics, basic differential equations) but NOT PhD-level domain expertise. Focus on:
-- Starting with big picture intuition, then diving into mathematical details
-- Defining domain-specific terms clearly
-- Walking through equations step by step with intuition for each term
-- Using analogies to bridge concepts
-- Balancing accessibility with technical accuracy`,
+- Starting with big picture intuition, then diving into rigorous mathematical details
+- Defining domain-specific terms clearly with proper mathematical definitions
+- Walking through equations step by step, explaining:
+  * What each variable and parameter represents (with proper notation)
+  * The meaning of advanced notation (e.g., \\nabla for gradient, \\partial for partial derivatives, \\sum vs \\int, set notation like \\in, \\subseteq)
+  * Index notation and summation conventions (Einstein notation if used)
+  * Special function notation (e.g., \\mathbb{E}[X] for expectation, \\mathcal{L} for loss/Lagrangian)
+  * Vector/matrix dimensions and what operations mean geometrically
+- Explaining the mathematical reasoning: why each step follows, what properties are being used
+- Being precise about assumptions, domains, and constraints
+- Balancing rigor with intuition - provide both the formal math and the conceptual understanding`,
 
   phd: `Your audience has graduate-level mathematical maturity and domain knowledge. Focus on:
 - Discussing theoretical implications and connections to related work
