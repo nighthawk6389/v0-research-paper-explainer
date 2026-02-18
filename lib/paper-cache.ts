@@ -14,7 +14,16 @@ const DB_NAME = "paper-cache"
 const STORE_NAME = "papers"
 const DB_VERSION = 1
 
+// Check if we're in a browser environment
+function isClient(): boolean {
+  return typeof window !== "undefined" && typeof indexedDB !== "undefined"
+}
+
 function openDB(): Promise<IDBDatabase> {
+  if (!isClient()) {
+    return Promise.reject(new Error("IndexedDB not available"))
+  }
+  
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
 
@@ -43,6 +52,8 @@ export async function getCachedPaper(
   pdfBase64?: string,
   pdfUrl?: string
 ): Promise<CachedPaper | null> {
+  if (!isClient()) return null
+  
   try {
     const content = pdfBase64 || pdfUrl || ""
     if (!content) return null
@@ -79,6 +90,8 @@ export async function setCachedPaper(
   pdfUrl: string | null,
   model: string
 ): Promise<void> {
+  if (!isClient()) return
+  
   try {
     const content = pdfBase64 || pdfUrl || ""
     if (!content) return
@@ -115,6 +128,8 @@ export async function setCachedPaper(
 }
 
 export async function clearPaperCache(): Promise<void> {
+  if (!isClient()) return
+  
   try {
     const db = await openDB()
     return new Promise((resolve, reject) => {
