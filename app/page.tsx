@@ -45,26 +45,26 @@ export default function Home() {
   }, [hoveredSection, paper])
 
   const handleAnalyze = useCallback(
-    async (data: { pdfBase64?: string; url?: string; pdfBlob?: Blob; model: string }) => {
+    async (uploadData: { pdfBase64?: string; url?: string; pdfBlob?: Blob; model: string }) => {
       setIsLoading(true)
       setError(null)
       setPaper(null)
       setShowUploadHint(false)
       setLoadingStatus({ message: "Starting analysis..." })
-      setSelectedModel(data.model)
+      setSelectedModel(uploadData.model)
 
       // Store PDF data for the viewer
-      if (data.pdfBase64) {
-        setPdfBase64(data.pdfBase64)
+      if (uploadData.pdfBase64) {
+        setPdfBase64(uploadData.pdfBase64)
         setPdfUrl(null)
-      } else if (data.url) {
+      } else if (uploadData.url) {
         setPdfBase64(null)
-        setPdfUrl(data.url)
+        setPdfUrl(uploadData.url)
       }
 
       try {
         // Check cache first
-        const cached = await getCachedPaper(data.pdfBase64, data.url)
+        const cached = await getCachedPaper(uploadData.pdfBase64, uploadData.url)
         if (cached) {
           setPaper(cached.paper)
           toast.success("Loaded from cache", {
@@ -80,9 +80,9 @@ export default function Home() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            pdfBase64: data.pdfBase64,
-            url: data.url,
-            model: data.model,
+            pdfBase64: uploadData.pdfBase64,
+            url: uploadData.url,
+            model: uploadData.model,
           }),
         })
 
@@ -114,13 +114,15 @@ export default function Home() {
                 } else if (event === "complete") {
                   setPaper(data.paper)
                   
-                  // Cache the parsed paper
+                  // Cache the parsed paper using original upload data
                   await setCachedPaper(
                     data.paper,
-                    data.pdfBase64 || "",
-                    data.url || null,
+                    uploadData.pdfBase64 || "",
+                    uploadData.url || null,
                     selectedModel
-                  )
+                  ).catch((err) => {
+                    console.error("[v0] Failed to cache paper:", err)
+                  })
                   
                   toast.success("Paper analyzed successfully", {
                     description: `Found ${data.paper.sections.length} sections`,
