@@ -29,6 +29,7 @@ export default function Home() {
   const [deepDiveLatex, setDeepDiveLatex] = useState<string | null>(null)
   const [deepDiveSection, setDeepDiveSection] = useState<Section | null>(null)
   const [isDeepDiveOpen, setIsDeepDiveOpen] = useState(false)
+  const [selectedModel, setSelectedModel] = useState<string>("anthropic/claude-sonnet-4.5-20250219")
   const [loadingStatus, setLoadingStatus] = useState<{
     message: string
     detail?: string
@@ -49,6 +50,7 @@ export default function Home() {
       setPaper(null)
       setShowUploadHint(false)
       setLoadingStatus({ message: "Starting analysis..." })
+      setSelectedModel(data.model)
 
       // Store PDF data for the viewer
       if (data.pdfBase64) {

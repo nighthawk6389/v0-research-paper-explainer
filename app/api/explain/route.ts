@@ -12,6 +12,7 @@ export async function POST(req: Request) {
     sectionContent,
     previousSectionsContext,
     difficultyLevel,
+    model,
   }: {
     messages: UIMessage[]
     paperTitle: string
@@ -20,6 +21,7 @@ export async function POST(req: Request) {
     sectionContent: string
     previousSectionsContext?: string
     difficultyLevel?: DifficultyLevel
+    model?: string
   } = await req.json()
 
   const systemPrompt = buildExplainSystemPrompt(
@@ -31,8 +33,10 @@ export async function POST(req: Request) {
     difficultyLevel || "advanced"
   )
 
+  const selectedModel = model || "anthropic/claude-sonnet-4.5-20250219"
+
   const result = streamText({
-    model: "anthropic/claude-sonnet-4-20250514",
+    model: selectedModel,
     system: systemPrompt,
     messages: await convertToModelMessages(messages),
     abortSignal: req.signal,

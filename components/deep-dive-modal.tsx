@@ -197,15 +197,7 @@ export function DeepDiveModal({
                         query?: string
                         purpose?: string
                       }
-                      const output = tc.state === "output-available" ? (tc.output as {
-                        pods?: Array<{
-                          title: string
-                          plaintext?: string
-                          images: Array<{ src: string; alt: string; title: string }>
-                        }>
-                        images?: Array<{ src: string; alt: string; title: string }>
-                        error?: string
-                      }) : null
+                      const output = tc.state === "output-available" ? (tc.output as any) : null
 
                       return (
                         <div

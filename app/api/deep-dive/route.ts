@@ -20,11 +20,13 @@ export async function POST(req: Request) {
     latex,
     sectionContext,
     paperTitle,
+    model,
   }: {
     messages: UIMessage[]
     latex: string
     sectionContext: string
     paperTitle: string
+    model?: string
   } = await req.json()
 
   const wolframAlphaTool = tool({
@@ -97,8 +99,10 @@ YOUR ROLE:
 
 Be thorough but accessible. Aim for "aha!" moments where computation illuminates theory.`
 
+  const selectedModel = model || "anthropic/claude-sonnet-4.5-20250219"
+
   const result = streamText({
-    model: "anthropic/claude-sonnet-4-20250514",
+    model: selectedModel,
     system: systemPrompt,
     messages: await convertToModelMessages(messages),
     tools: {
