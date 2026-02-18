@@ -1,4 +1,4 @@
-import { streamObject, generateText, Output } from "ai"
+import { streamText, generateText, Output } from "ai"
 import { paperSchema } from "@/lib/paper-schema"
 import { PARSE_PAPER_PROMPT } from "@/lib/prompts"
 
@@ -159,9 +159,11 @@ export async function POST(req: Request) {
           console.log("[v0] Starting LLM parse with streaming structured output:", selectedModel)
           const llmStartTime = Date.now()
 
-          const result = streamObject({
+          const result = streamText({
             model: selectedModel,
-            schema: paperSchema,
+            output: Output.object({
+              schema: paperSchema,
+            }),
             messages: [
               {
                 role: "user",
@@ -184,7 +186,7 @@ export async function POST(req: Request) {
           let lastSectionCount = 0
 
           // Stream partial results as they arrive
-          for await (const partialObject of result.partialObjectStream) {
+          for await (const partialObject of result.partialOutputStream) {
             const currentSectionCount = partialObject?.sections?.length || 0
 
             // Send progress updates when new sections are parsed
@@ -200,20 +202,13 @@ export async function POST(req: Request) {
             }
           }
 
-          // Wait for final output
-          const { object: output } = await result
-          console.log(output)
+          // Get final output
+          const output = await result.output
 
           const llmDuration = Date.now() - llmStartTime
-          console.log("[v0] LLM parse completed", {
-            duration: `${llmDuration}ms`,
-            hasOutput: !!output,
-            outputType: typeof output,
-            sectionsFound: output?.sections?.length,
-          })
 
           if (!output) {
-            console.log("[v0] Parse failed: No structured output returned")
+            console.error("[v0] Parse failed: No structured output returned")
             send("error", {
               error:
                 "Failed to parse the paper. The LLM did not return structured output.",
@@ -222,20 +217,8 @@ export async function POST(req: Request) {
             return
           }
 
-          // Validate output structure
-          console.log("[v0] Validating output structure", {
-            hasTitle: !!output.title,
-            hasSections: !!output.sections,
-            sectionsType: Array.isArray(output.sections) ? "array" : typeof output.sections,
-            sectionsLength: Array.isArray(output.sections) ? output.sections.length : "N/A",
-          })
-
           if (!Array.isArray(output.sections)) {
-            const sectionsStr = output.sections ? JSON.stringify(output.sections).substring(0, 100) : "undefined"
-            console.error("[v0] Parse failed: sections is not an array", {
-              sectionsType: typeof output.sections,
-              sectionsValue: sectionsStr,
-            })
+            console.error("[v0] Parse failed: sections is not an array", typeof output.sections)
             send("error", {
               error: "Failed to parse the paper. Invalid section structure.",
             })
@@ -244,12 +227,11 @@ export async function POST(req: Request) {
           }
 
           const totalDuration = Date.now() - startTime
-          console.log("[v0] Parse paper request completed successfully", {
+          console.log("[v0] Parse completed", {
             totalDuration: `${totalDuration}ms`,
             llmDuration: `${llmDuration}ms`,
             sections: output.sections.length,
             title: output.title,
-            firstSectionId: output.sections[0]?.id,
           })
 
           send("complete", { paper: output })
