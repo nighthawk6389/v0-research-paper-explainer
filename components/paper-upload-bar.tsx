@@ -94,11 +94,11 @@ export function PaperUploadBar({ onAnalyze, isLoading, showUploadHint }: PaperUp
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="anthropic/claude-sonnet-4.5">
-                Claude Sonnet 4.5
-              </SelectItem>
               <SelectItem value="anthropic/claude-haiku-4.5">
                 Claude Haiku 4.5
+              </SelectItem>
+              <SelectItem value="anthropic/claude-sonnet-4.5">
+                Claude Sonnet 4.5
               </SelectItem>
               <SelectItem value="openai/gpt-4o">GPT-4o</SelectItem>
               <SelectItem value="openai/gpt-4o-mini">GPT-4o Mini</SelectItem>
