@@ -261,7 +261,7 @@ export function ExplanationModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="max-w-[95vw] w-full h-[90vh] flex flex-col p-0 gap-0">
+      <DialogContent className="max-w-[98vw] w-full h-[92vh] flex flex-col p-0 gap-0">
         <DialogTitle className="sr-only">
           {section?.heading || "Section Explanation"}
         </DialogTitle>
