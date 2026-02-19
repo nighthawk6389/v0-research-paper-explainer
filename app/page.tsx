@@ -93,6 +93,7 @@ export default function Home() {
         const reader = response.body.getReader()
         const decoder = new TextDecoder()
         let buffer = ""
+        let receivedComplete = false
 
         while (true) {
           const { done, value } = await reader.read()
@@ -112,6 +113,7 @@ export default function Home() {
                 if (event === "status") {
                   setLoadingStatus(data)
                 } else if (event === "complete") {
+                  receivedComplete = true
                   console.log("[v0] Parse complete event received", {
                     hasData: !!data,
                     hasPaper: !!data?.paper,
@@ -174,6 +176,13 @@ export default function Home() {
               }
             }
           }
+        }
+
+        // If stream ended without receiving a complete event, it likely timed out
+        if (!receivedComplete) {
+          throw new Error(
+            "Paper analysis timed out. The paper may be too large or complex. Try using a faster model like Claude Haiku 4.5, or try again later."
+          )
         }
       } catch (err) {
         const message =
