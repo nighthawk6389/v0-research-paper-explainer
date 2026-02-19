@@ -7,6 +7,7 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -265,6 +266,9 @@ export function ExplanationModal({
         <DialogTitle className="sr-only">
           {section?.heading || "Section Explanation"}
         </DialogTitle>
+        <DialogDescription className="sr-only">
+          AI-generated explanation of the {section?.heading || "section"} from the research paper
+        </DialogDescription>
 
         {/* Header */}
         <div className="px-5 pt-4 pb-3 border-b shrink-0 flex items-center justify-between gap-4">
