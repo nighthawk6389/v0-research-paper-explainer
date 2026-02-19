@@ -28,7 +28,7 @@ export function PaperUploadBar({ onAnalyze, isLoading, showUploadHint }: PaperUp
   const [fileName, setFileName] = useState<string | null>(null)
   const [pdfBase64, setPdfBase64] = useState<string | null>(null)
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null)
-  const [model, setModel] = useState("anthropic/claude-sonnet-4.5")
+  const [model, setModel] = useState("anthropic/claude-haiku-4.5")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileChange = useCallback(

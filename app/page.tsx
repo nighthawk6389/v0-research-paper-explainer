@@ -30,7 +30,7 @@ export default function Home() {
   const [deepDiveLatex, setDeepDiveLatex] = useState<string | null>(null)
   const [deepDiveSection, setDeepDiveSection] = useState<Section | null>(null)
   const [isDeepDiveOpen, setIsDeepDiveOpen] = useState(false)
-  const [selectedModel, setSelectedModel] = useState<string>("anthropic/claude-sonnet-4.5")
+  const [selectedModel, setSelectedModel] = useState<string>("anthropic/claude-haiku-4.5")
   const [loadingStatus, setLoadingStatus] = useState<{
     message: string
     detail?: string

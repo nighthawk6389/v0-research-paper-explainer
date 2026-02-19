@@ -46,7 +46,7 @@ export async function POST(req: Request) {
           })
 
           let pdfData: string = pdfBase64
-          const selectedModel = model || "anthropic/claude-sonnet-4.5"
+          const selectedModel = model || "anthropic/claude-haiku-4.5"
           console.log("[v0] Using model:", selectedModel)
 
           const modelDisplayNames: Record<string, string> = {
@@ -264,7 +264,7 @@ export async function POST(req: Request) {
   // Non-streaming fallback (original behavior)
   try {
     const { pdfBase64, url, model } = await req.json()
-    const selectedModel = model || "anthropic/claude-sonnet-4.5"
+    const selectedModel = model || "anthropic/claude-haiku-4.5"
 
     let pdfData: string = pdfBase64
 

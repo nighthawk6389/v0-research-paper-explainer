@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     difficultyLevel || "advanced"
   )
 
-  const selectedModel = model || "anthropic/claude-sonnet-4.5"
+  const selectedModel = model || "anthropic/claude-haiku-4.5"
   console.log("[v0] Using model:", selectedModel)
 
   try {
