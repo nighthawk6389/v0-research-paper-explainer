@@ -112,6 +112,31 @@ export default function Home() {
                 if (event === "status") {
                   setLoadingStatus(data)
                 } else if (event === "complete") {
+                  console.log("[v0] Parse complete event received", {
+                    hasData: !!data,
+                    hasPaper: !!data?.paper,
+                    paperType: typeof data?.paper,
+                    hasSections: !!data?.paper?.sections,
+                    sectionsType: Array.isArray(data?.paper?.sections) ? "array" : typeof data?.paper?.sections,
+                    sectionsLength: data?.paper?.sections?.length,
+                  })
+
+                  if (!data?.paper) {
+                    console.error("[v0] Complete event has no paper data", { data })
+                    throw new Error("Parse completed but no paper data received")
+                  }
+
+                  if (!Array.isArray(data.paper.sections)) {
+                    console.error("[v0] Paper sections is not an array", {
+                      sectionsType: typeof data.paper.sections,
+                    })
+                    throw new Error("Paper sections are not in the expected format")
+                  }
+
+                  console.log("[v0] Setting paper state", {
+                    title: data.paper.title,
+                    sections: data.paper.sections.length,
+                  })
                   setPaper(data.paper)
                   
                   // Cache the parsed paper using original upload data

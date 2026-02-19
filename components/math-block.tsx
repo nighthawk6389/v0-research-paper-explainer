@@ -10,6 +10,7 @@ interface MathBlockProps {
   label?: string | null
   className?: string
   onDeepDive?: (latex: string) => void
+  deepDiveLabel?: string
 }
 
 export function MathBlock({
@@ -18,6 +19,7 @@ export function MathBlock({
   label,
   className = "",
   onDeepDive,
+  deepDiveLabel,
 }: MathBlockProps) {
   const html = useMemo(() => {
     try {
@@ -70,10 +72,10 @@ export function MathBlock({
               onDeepDive(latex)
             }}
             className="absolute top-1.5 right-1.5 flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200 opacity-0 group-hover/math:opacity-100 transition-opacity hover:bg-orange-200 dark:hover:bg-orange-800"
-            title="Deep dive with Wolfram Alpha"
+            title={deepDiveLabel || "Deep dive with Wolfram Alpha"}
           >
             <Sigma className="size-3" />
-            Deep Dive
+            {deepDiveLabel || "Deep Dive"}
           </button>
         )}
       </div>
