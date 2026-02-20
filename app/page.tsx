@@ -17,6 +17,146 @@ import {
 import { Toaster, toast } from "sonner"
 import type { Paper, Section } from "@/lib/paper-schema"
 
+interface SseEventData {
+  paper?: Paper
+  fetchFailed?: boolean
+  error?: string
+  message?: string
+  detail?: string
+}
+
+type SseEventCount = { status: number; complete: number; error: number; other: number }
+
+function parseSseData(rawData: string, event: string, eventCount: SseEventCount): SseEventData | null {
+  try {
+    return JSON.parse(rawData) as SseEventData
+  } catch (parseErr) {
+    console.error("[v0] SSE data parse failed", {
+      event,
+      rawDataSnippet: rawData.slice(0, 120),
+      error: parseErr instanceof Error ? parseErr.message : String(parseErr),
+    })
+    if (event === "error") {
+      throw new Error("Failed to parse paper")
+    }
+    eventCount.other++
+    return null
+  }
+}
+
+function validatePaper(data: SseEventData): Paper {
+  if (!data?.paper) {
+    console.error("[v0] Complete event has no paper data", { data })
+    throw new Error("Parse completed but no paper data received")
+  }
+  if (!Array.isArray(data.paper.sections)) {
+    console.error("[v0] Paper sections is not an array", {
+      sectionsType: typeof data.paper.sections,
+    })
+    throw new Error("Paper sections are not in the expected format")
+  }
+  return data.paper
+}
+
+interface StreamCallbacks {
+  onStatus: (data: SseEventData) => void
+  onComplete: (paper: Paper) => Promise<void>
+  onFetchError: () => void
+}
+
+async function readParseStream(response: Response, callbacks: StreamCallbacks): Promise<void> {
+  if (!response.body) {
+    throw new Error("Failed to start analysis")
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ""
+  let receivedComplete = false
+  const eventCount: SseEventCount = { status: 0, complete: 0, error: 0, other: 0 }
+  let chunkIndex = 0
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) {
+        console.log("[v0] SSE stream ended", {
+          receivedComplete,
+          eventCount,
+          bufferLength: buffer.length,
+          remainingBuffer: buffer.slice(0, 200),
+        })
+        break
+      }
+
+      chunkIndex++
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split("\n")
+      buffer = lines.pop() || ""
+
+      if (lines.length > 0 && chunkIndex <= 3) {
+        console.log("[v0] SSE chunk", { chunkIndex, lineCount: lines.length, firstLine: lines[0]?.slice(0, 80) })
+      }
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]
+        if (!line.startsWith("event:")) continue
+
+        const event = line.slice(6).trim()
+        const nextLine = lines[i + 1]
+        if (!nextLine?.startsWith("data:")) {
+          console.warn("[v0] SSE event without data line", { event, nextLine: nextLine?.slice(0, 60), lineIndex: i })
+          eventCount.other++
+          continue
+        }
+
+        const data = parseSseData(nextLine.slice(5).trim(), event, eventCount)
+        if (!data) continue
+
+        if (event === "status") {
+          eventCount.status++
+          if (eventCount.status <= 2 || data.message) {
+            console.log("[v0] SSE status", { eventCount: eventCount.status, message: data.message, detail: data.detail })
+          }
+          callbacks.onStatus(data)
+        } else if (event === "complete") {
+          eventCount.complete++
+          console.log("[v0] SSE complete received", {
+            eventCount: eventCount.complete,
+            hasPaper: !!data?.paper,
+            sectionsLength: data?.paper?.sections?.length,
+          })
+          const paper = validatePaper(data)
+          console.log("[v0] Setting paper state", { title: paper.title, sections: paper.sections.length })
+          await callbacks.onComplete(paper)
+          receivedComplete = true
+          return
+        } else if (event === "error") {
+          eventCount.error++
+          console.log("[v0] SSE error received", { eventCount: eventCount.error, fetchFailed: data.fetchFailed, error: data.error })
+          if (data.fetchFailed) {
+            callbacks.onFetchError()
+            return
+          }
+          throw new Error(data.error || "Failed to parse paper")
+        } else {
+          eventCount.other++
+          console.warn("[v0] SSE unknown event type", { event, keys: Object.keys(data).slice(0, 5) })
+        }
+      }
+    }
+
+    if (!receivedComplete) {
+      console.error("[v0] Stream ended without complete — throwing timeout", { eventCount, receivedComplete })
+      throw new Error(
+        "Paper analysis timed out. The paper may be too large or complex. Try using a faster model like Claude Haiku 4.5, or try again later."
+      )
+    }
+  } finally {
+    reader.releaseLock()
+  }
+}
+
 export default function Home() {
   const [paper, setPaper] = useState<Paper | null>(null)
   const [pdfBase64, setPdfBase64] = useState<string | null>(null)
@@ -37,7 +177,6 @@ export default function Home() {
     model?: string
   } | null>(null)
 
-  // Compute highlighted page from hovered section
   const highlightedPage = useMemo(() => {
     if (!hoveredSection || !paper) return null
     const section = paper.sections.find((s) => s.id === hoveredSection)
@@ -53,7 +192,6 @@ export default function Home() {
       setLoadingStatus({ message: "Starting analysis..." })
       setSelectedModel(uploadData.model)
 
-      // Store PDF data for the viewer
       if (uploadData.pdfBase64) {
         setPdfBase64(uploadData.pdfBase64)
         setPdfUrl(null)
@@ -63,19 +201,15 @@ export default function Home() {
       }
 
       try {
-        // Check cache first
         const cached = await getCachedPaper(uploadData.pdfBase64, uploadData.url)
         if (cached) {
           setPaper(cached.paper)
           toast.success("Loaded from cache", {
             description: `${cached.paper.title} - ${cached.paper.sections.length} sections`,
           })
-          setIsLoading(false)
-          setLoadingStatus(null)
           return
         }
 
-        // Use streaming endpoint
         const response = await fetch("/api/parse-paper?stream=true", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -86,152 +220,38 @@ export default function Home() {
           }),
         })
 
-        if (!response.ok || !response.body) {
+        if (!response.ok) {
           throw new Error("Failed to start analysis")
         }
 
-        const reader = response.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ""
-        let receivedComplete = false
-        let eventCount = { status: 0, complete: 0, error: 0, other: 0 }
-        let chunkIndex = 0
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) {
-            console.log("[v0] SSE stream ended", {
-              receivedComplete,
-              eventCount,
-              bufferLength: buffer.length,
-              remainingBuffer: buffer.slice(0, 200),
+        await readParseStream(response, {
+          onStatus: (data) => setLoadingStatus(data),
+          onComplete: async (validPaper) => {
+            setPaper(validPaper)
+            await setCachedPaper(
+              validPaper,
+              uploadData.pdfBase64 || "",
+              uploadData.url || null,
+              uploadData.model
+            ).catch((err) => {
+              console.error("[v0] Failed to cache paper:", err)
             })
-            break
-          }
-
-          chunkIndex++
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split("\n")
-          buffer = lines.pop() || ""
-
-          if (lines.length > 0 && chunkIndex <= 3) {
-            console.log("[v0] SSE chunk", { chunkIndex, lineCount: lines.length, firstLine: lines[0]?.slice(0, 80) })
-          }
-
-          for (let i = 0; i < lines.length; i++) {
-            const line = lines[i]
-            if (line.startsWith("event:")) {
-              const event = line.slice(6).trim()
-              const nextLine = lines[i + 1]
-              if (!nextLine?.startsWith("data:")) {
-                console.warn("[v0] SSE event without data line", { event, nextLine: nextLine?.slice(0, 60), lineIndex: i })
-                eventCount.other++
-                continue
-              }
-
-              const rawData = nextLine.slice(5).trim()
-              let data: { paper?: Paper; fetchFailed?: boolean; error?: string; message?: string; detail?: string }
-              try {
-                data = JSON.parse(rawData) as typeof data
-              } catch (parseErr) {
-                console.error("[v0] SSE data parse failed", {
-                  event,
-                  rawDataSnippet: rawData.slice(0, 120),
-                  error: parseErr instanceof Error ? parseErr.message : String(parseErr),
-                })
-                if (event === "error") {
-                  throw new Error("Failed to parse paper")
-                }
-                eventCount.other++
-                continue
-              }
-
-              if (event === "status") {
-                eventCount.status++
-                if (eventCount.status <= 2 || data.message) {
-                  console.log("[v0] SSE status", { eventCount: eventCount.status, message: data.message, detail: data.detail })
-                }
-                setLoadingStatus(data)
-              } else if (event === "complete") {
-                eventCount.complete++
-                console.log("[v0] SSE complete received", {
-                  eventCount: eventCount.complete,
-                  hasPaper: !!data?.paper,
-                  sectionsLength: data?.paper?.sections?.length,
-                })
-
-                  if (!data?.paper) {
-                    console.error("[v0] Complete event has no paper data", { data })
-                    throw new Error("Parse completed but no paper data received")
-                  }
-
-                  if (!Array.isArray(data.paper.sections)) {
-                    console.error("[v0] Paper sections is not an array", {
-                      sectionsType: typeof data.paper.sections,
-                    })
-                    throw new Error("Paper sections are not in the expected format")
-                  }
-
-                  const validPaper = data.paper
-                  console.log("[v0] Setting paper state", {
-                    title: validPaper.title,
-                    sections: validPaper.sections.length,
-                  })
-                  setPaper(validPaper)
-                  
-                  // Cache the parsed paper using original upload data
-                  await setCachedPaper(
-                    validPaper,
-                    uploadData.pdfBase64 || "",
-                    uploadData.url || null,
-                    selectedModel
-                  ).catch((err) => {
-                    console.error("[v0] Failed to cache paper:", err)
-                  })
-                  
-                  toast.success("Paper analyzed successfully", {
-                    description: `Found ${validPaper.sections.length} sections`,
-                  })
-                  receivedComplete = true
-                  setIsLoading(false)
-                  setLoadingStatus(null)
-                  return
-                } else if (event === "error") {
-                  eventCount.error++
-                  console.log("[v0] SSE error received", { eventCount: eventCount.error, fetchFailed: data.fetchFailed, error: data.error })
-                  if (data.fetchFailed) {
-                    setError(null)
-                    setShowUploadHint(true)
-                    toast.error("Could not download from this URL", {
-                      description:
-                        "This publisher blocks automated downloads. Please download the PDF in your browser and use the Upload button instead.",
-                      duration: 8000,
-                    })
-                  } else {
-                    throw new Error(data.error || "Failed to parse paper")
-                  }
-                  setIsLoading(false)
-                  setLoadingStatus(null)
-                  return
-                } else {
-                  eventCount.other++
-                  console.warn("[v0] SSE unknown event type", { event, keys: data ? Object.keys(data).slice(0, 5) : [] })
-                }
-              }
-            }
-          }
-        }
-
-        // If stream ended without receiving a complete event, it likely timed out
-        if (!receivedComplete) {
-          console.error("[v0] Stream ended without complete — throwing timeout", { eventCount, receivedComplete })
-          throw new Error(
-            "Paper analysis timed out. The paper may be too large or complex. Try using a faster model like Claude Haiku 4.5, or try again later."
-          )
-        }
+            toast.success("Paper analyzed successfully", {
+              description: `Found ${validPaper.sections.length} sections`,
+            })
+          },
+          onFetchError: () => {
+            setError(null)
+            setShowUploadHint(true)
+            toast.error("Could not download from this URL", {
+              description:
+                "This publisher blocks automated downloads. Please download the PDF in your browser and use the Upload button instead.",
+              duration: 8000,
+            })
+          },
+        })
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "An error occurred"
+        const message = err instanceof Error ? err.message : "An error occurred"
         setError(message)
         toast.error("Analysis failed", { description: message })
       } finally {
@@ -249,7 +269,6 @@ export default function Home() {
 
   const handleModalClose = useCallback(() => {
     setIsModalOpen(false)
-    // Delay clearing the section so the close animation plays
     setTimeout(() => setSelectedSection(null), 300)
   }, [])
 
@@ -267,7 +286,6 @@ export default function Home() {
     }, 300)
   }, [])
 
-  // Build section context text for deep dive
   const deepDiveSectionContext = useMemo(() => {
     if (!deepDiveSection) return ""
     return deepDiveSection.content
@@ -333,7 +351,6 @@ export default function Home() {
         onClose={handleDeepDiveClose}
       />
 
-      {/* Error banner */}
       {error && !isLoading && (
         <div className="absolute bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-destructive/10 border border-destructive/20 rounded-lg p-3">
           <p className="text-sm text-destructive font-medium">
