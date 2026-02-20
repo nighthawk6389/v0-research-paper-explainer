@@ -4,11 +4,12 @@ This document details how Paper Explainer leverages large language models and ex
 
 ## Overview
 
-The application uses three primary integration points:
+The application uses four primary integration points:
 
-1. **PDF Parsing**: LLM with structured output (AI SDK `Output.object()`)
+1. **PDF Parsing**: LLM with structured output (AI SDK `streamText()` + `Output.object()`, streaming partial results)
 2. **Section Explanation**: Streaming chat with difficulty-aware prompting (AI SDK `streamText()`)
-3. **Mathematical Analysis**: Tool-calling agent with Wolfram Alpha (AI SDK tools + external API)
+3. **Inline Formula Explain**: Short streaming explanations for inline math (AI SDK `streamText()`)
+4. **Mathematical Analysis**: Tool-calling agent with Wolfram Alpha (AI SDK tools + external API)
 
 ## 1. PDF Parsing with Structured Output
 
@@ -24,12 +25,14 @@ The application uses three primary integration points:
 
 ### Flow
 
+When streaming is enabled (`?stream=true`), the parse API uses `streamText()` with `Output.object()` so partial results can be sent as the LLM produces them:
+
 ```typescript
-import { generateText, Output } from "ai"
+import { streamText, Output } from "ai"
 import { paperSchema } from "@/lib/paper-schema"
 
-const { output } = await generateText({
-  model: "anthropic/claude-sonnet-4-20250514", // or user-selected model
+const result = streamText({
+  model: selectedModel, // e.g. anthropic/claude-haiku-4.5
   output: Output.object({
     schema: paperSchema, // Zod schema
   }),
@@ -48,7 +51,20 @@ const { output } = await generateText({
     },
   ],
 })
+
+// Stream progress: send status events when section count increases
+for await (const partialObject of result.partialOutputStream) {
+  const sectionCount = partialObject?.sections?.length || 0
+  if (sectionCount > lastSectionCount) {
+    send("status", { message: "Parsing...", detail: `Extracted ${sectionCount} sections` })
+    lastSectionCount = sectionCount
+  }
+}
+
+const output = await result.output
 ```
+
+The non-streaming fallback uses `generateText()` with the same `Output.object()` and schema.
 
 ### Key Features
 
@@ -151,15 +167,16 @@ data: {"paper": {...}}
 ### Model Selection
 
 Users can choose between:
-- **Claude Sonnet 4** (default, best balance)
-- **GPT-4o** (faster, slightly less accurate on math)
+- **Claude Haiku 4.5** (default, fast and cost-effective)
+- **Claude Sonnet 4.5** (best balance of speed and quality)
+- **GPT-4o** (fast, good for many papers)
 - **GPT-4o Mini** (cheapest, good for simple papers)
-- **Claude Opus 4** (most expensive, highest quality)
+- **Claude Opus 4** (highest quality, most expensive)
 
 Model name dynamically updates in status messages:
 ```typescript
 const modelName = modelDisplayNames[selectedModel]
-send("status", { message: `${modelName} is reading...` })
+send("status", { message: `${modelName} is reading...`, detail: "...", model: "..." })
 ```
 
 ### Cost Analysis
@@ -280,7 +297,17 @@ Per explanation:
 - Output: 1,000-3,000 tokens (explanation)
 - Cost: $0.02-0.08 per explanation
 
-## 3. Wolfram Alpha Deep Dive (Tool-Calling Agent)
+## 3. Inline Formula Explain
+
+### Implementation: `/app/api/formula-explain/route.ts`
+
+**Core Technology**: AI SDK's `streamText()` with a concise, non-tool system prompt.
+
+Used when the user clicks an inline equation inside an explanation. The modal/section explain flow uses **InlineFormulaExplain** (e.g. popover) which calls this API with the LaTeX, paper title, and section context. The prompt instructs the model to give 2–4 short paragraphs, define symbols, and not use tools. Responses are streamed like the main explain endpoint.
+
+**Request body**: `{ messages, latex, paperTitle, sectionContext }`. Model is fixed (e.g. Claude Haiku 4.5) for speed and cost.
+
+## 4. Wolfram Alpha Deep Dive (Tool-Calling Agent)
 
 ### Implementation: `/app/api/deep-dive/route.ts`
 
@@ -486,7 +513,8 @@ const model = "anthropic/claude-sonnet-4-20250514"
 ### Parsing Errors
 ```typescript
 try {
-  const result = await generateText(...)
+  const result = streamText(...) // or generateText for non-streaming
+  const output = await result.output
 } catch (error) {
   if (error.message.includes("output schema")) {
     return Response.json(
@@ -513,9 +541,9 @@ export const maxDuration = 60 // seconds
 ## Performance Optimization
 
 ### 1. Caching
-- Parsed papers could be cached (not implemented yet)
-- Explanations for common sections could be pre-generated
-- Wolfram queries could be memoized
+- **Parsed papers**: Cached in IndexedDB (`lib/paper-cache.ts`) by PDF content/URL; repeat analyses load instantly
+- Explanations for common sections could be pre-generated (not implemented)
+- Wolfram queries could be memoized (not implemented)
 
 ### 2. Parallel Processing
 - Multiple sections could be explained in parallel

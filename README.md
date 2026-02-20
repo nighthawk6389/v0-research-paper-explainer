@@ -13,8 +13,10 @@ Paper Explainer uses large language models to parse academic PDFs and provide in
 - **Interactive Explanations**: Click any section to get detailed, streaming AI explanations tailored to your mathematical background
 - **Difficulty Levels**: Choose between Basic, Advanced (default), or PhD-level explanations
 - **Mathematical Deep Dives**: Hover over equations to access Wolfram Alpha integration for step-by-step derivations, plots, and symbolic manipulation
-- **Model Selection**: Choose between Claude Sonnet 4, GPT-4o, GPT-4o Mini, or Claude Opus 4 for paper parsing
+- **Model Selection**: Choose between Claude Haiku 4.5 (default), Claude Sonnet 4.5, GPT-4o, GPT-4o Mini, or Claude Opus 4 for paper parsing
 - **Progress Tracking**: Real-time streaming status updates during analysis with humorous commentary
+- **Paper Caching**: Parsed papers are cached in IndexedDB so re-opening the same PDF loads instantly
+- **Inline Formula Explain**: Click inline equations in explanations for quick, concise formula breakdowns (separate from full Deep Dive)
 
 ## Technology Stack
 
@@ -57,19 +59,21 @@ Visit `http://localhost:3000` to use the application.
 
 1. **Upload a Paper**: Paste a PDF URL (e.g., arXiv direct PDF link) or upload a PDF file
 2. **Select Model**: Choose your preferred LLM (Claude Sonnet 4 recommended)
-3. **Analyze**: Click "Analyze" and wait for AI-powered parsing (30-60 seconds)
+3. **Analyze**: Click "Analyze" and wait for AI-powered parsing (30-60 seconds); repeat analyses load from cache
 4. **Explore Sections**: Click any section on the right to open an explanation modal
 5. **Adjust Difficulty**: Use the difficulty selector (Basic/Advanced/PhD) in the explanation modal
-6. **Deep Dive Math**: Hover over display equations and click "Deep Dive" for Wolfram Alpha analysis
-7. **Ask Follow-ups**: Use the chat input in modals to ask clarifying questions
+6. **Inline Formula Explain**: Click inline math in explanations for a short formula breakdown
+7. **Deep Dive Math**: Hover over display equations and click "Deep Dive" for Wolfram Alpha analysis
+8. **Ask Follow-ups**: Use the chat input in modals to ask clarifying questions
 
 ## Project Structure
 
 ```
 ├── app/
 │   ├── api/
-│   │   ├── parse-paper/route.ts    # PDF parsing with LLM
+│   │   ├── parse-paper/route.ts     # PDF parsing with LLM (streaming)
 │   │   ├── explain/route.ts         # Section explanation streaming
+│   │   ├── formula-explain/route.ts # Inline formula quick explanations
 │   │   └── deep-dive/route.ts       # Wolfram Alpha integration
 │   ├── layout.tsx
 │   ├── page.tsx                     # Main application
@@ -80,13 +84,21 @@ Visit `http://localhost:3000` to use the application.
 │   ├── structured-view.tsx          # Right panel section list
 │   ├── section-block.tsx            # Individual collapsible sections
 │   ├── explanation-modal.tsx        # Section explanation + chat
+│   ├── inline-formula-explain.tsx   # Inline formula popover explanations
 │   ├── deep-dive-modal.tsx          # Wolfram Alpha results
 │   ├── math-block.tsx               # KaTeX rendering
-│   └── markdown-content.tsx         # Styled prose rendering
+│   ├── markdown-content.tsx         # Styled prose rendering
+│   ├── paper-loading.tsx            # Loading state with status
+│   ├── paper-empty-state.tsx        # Empty state
+│   ├── theme-provider.tsx           # Theme context
+│   └── ui/                          # shadcn/ui components
 ├── lib/
 │   ├── paper-schema.ts              # Zod schemas for structured output
+│   ├── paper-cache.ts               # IndexedDB cache for parsed papers
 │   ├── prompts.ts                   # LLM prompt templates
 │   ├── wolfram-alpha.ts             # Wolfram API integration
+│   ├── pdf-text-search.ts           # PDF text search (for future highlighting)
+│   ├── config.ts                    # API config (e.g. maxDuration)
 │   └── utils.ts
 └── docs/                            # Documentation
 ```
@@ -96,7 +108,9 @@ Visit `http://localhost:3000` to use the application.
 - [Architecture Overview](docs/architecture.md) - System design and data flow
 - [LLM Integration Guide](docs/llm-integration.md) - How AI features are implemented
 - [PDF Parsing Alternatives](docs/pdf-parsing-alternatives.md) - Other approaches to PDF extraction
+- [PDF Text Highlighting](docs/pdf-text-highlighting.md) - Page-level vs text-level highlighting
 - [Regeneration Prompt](docs/regeneration-prompt.md) - Comprehensive prompt to rebuild this app
+- [Testing Guide](TESTING.md) - How to run and write tests
 
 ## API Routes
 
@@ -112,7 +126,7 @@ Parses a PDF and extracts structured sections.
 {
   "pdfBase64": "base64-encoded-pdf-data",
   "url": "https://arxiv.org/pdf/XXXX.XXXXX",
-  "model": "anthropic/claude-sonnet-4-20250514"
+  "model": "anthropic/claude-haiku-4.5"
 }
 ```
 
@@ -137,6 +151,20 @@ Streams explanations for a specific section with difficulty level support.
   "sectionHeading": "3. Methodology",
   "sectionContent": "...",
   "difficultyLevel": "advanced"
+}
+```
+
+### POST /api/formula-explain
+
+Streams a concise explanation for an inline formula (used when clicking math in explanations).
+
+**Request Body:**
+```json
+{
+  "messages": [...],
+  "latex": "E = mc^2",
+  "paperTitle": "Paper Title",
+  "sectionContext": "..."
 }
 ```
 

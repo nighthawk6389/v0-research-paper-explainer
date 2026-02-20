@@ -4,18 +4,20 @@ This directory contains the test suite for the Research Paper Explainer applicat
 
 ## Running Tests
 
+This project uses **pnpm**. From the repository root:
+
 ```bash
 # Run all tests
-npm test
+pnpm test
 
 # Run tests with UI
-npm run test:ui
+pnpm test:ui
 
 # Run tests with coverage
-npm run test:coverage
+pnpm test:coverage
 
 # Run tests in watch mode
-npm test -- --watch
+pnpm test -- --watch
 ```
 
 ## Test Structure
@@ -38,6 +40,12 @@ npm test -- --watch
   - Required fields
   - Optional fields
 
+- **app/api/parse-paper/route.test.ts** - Tests for the parse-paper API route
+  - Streaming progress updates
+  - PDF input handling (base64 and URL)
+  - Model configuration
+  - Error scenarios
+
 ## Testing Framework
 
 We use [Vitest](https://vitest.dev/) as our testing framework, which provides:
@@ -57,7 +65,7 @@ Tests that require browser APIs (like IndexedDB) use:
 To generate a coverage report:
 
 ```bash
-npm run test:coverage
+pnpm test:coverage
 ```
 
 This will create a coverage report in the `coverage/` directory.

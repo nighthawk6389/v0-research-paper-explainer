@@ -20,7 +20,7 @@ Create an interactive tool that helps readers understand complex academic papers
 
 - **Framework**: Next.js 16 with App Router, React 19, TypeScript 5
 - **Styling**: Tailwind CSS v4 (inline theme in globals.css), shadcn/ui components
-- **AI**: Vercel AI SDK 6.0 with `generateText`, `streamText`, and tool-calling
+- **AI**: Vercel AI SDK 6.0 with `streamText` (and `generateText` for non-streaming fallback), `Output.object()`, and tool-calling
 - **PDF**: react-pdf with pdfjs-dist for rendering
 - **Math**: KaTeX for LaTeX rendering, react-markdown with remark-math/rehype-katex
 - **UI Libraries**: Radix UI primitives, lucide-react icons, sonner for toasts
@@ -32,7 +32,7 @@ Create an interactive tool that helps readers understand complex academic papers
 
 **Upload Interface** (`components/paper-upload-bar.tsx`):
 - Top bar with two input methods: URL paste (for arXiv, etc.) or file upload
-- Model selection dropdown: Claude Sonnet 4 (default), GPT-4o, GPT-4o Mini, Claude Opus 4
+- Model selection dropdown: Claude Haiku 4.5 (default), Claude Sonnet 4.5, GPT-4o, GPT-4o Mini, Claude Opus 4
 - "Analyze" button that triggers parsing
 - Loading state with humorous status messages
 - Error handling with helpful hints (e.g., "Publisher blocks downloads, try uploading instead")
@@ -41,9 +41,10 @@ Create an interactive tool that helps readers understand complex academic papers
 - POST endpoint accepting: `{ pdfBase64?, url?, model }`
 - Query param `?stream=true` enables Server-Sent Events (SSE) for progress updates
 - If URL provided: fetch with browser-like headers, convert to base64
-- Send to LLM with structured output using AI SDK's `Output.object()` and Zod schema
-- Stream status events: "Downloading...", "Asking Claude...", "Claude is reading..."
+- Send to LLM with structured output using AI SDK's `streamText()` + `Output.object()` and Zod schema; use `partialOutputStream` to stream progress as sections are extracted
+- Stream status events: "Downloading...", "Asking model...", "Model is reading...", "Model is parsing... (N sections)"
 - Return complete event with parsed paper object
+- Client may check IndexedDB cache first (same PDF/URL) and store result in cache after parse
 - Handle fetch failures gracefully (some publishers block server downloads)
 
 **Data Schema** (`lib/paper-schema.ts`):
@@ -129,6 +130,12 @@ Paper: {
 - Return `toUIMessageStreamResponse()` for streaming to client
 - Client uses `useChat()` hook with `DefaultChatTransport`
 
+**Inline Formula Explain** (`app/api/formula-explain/route.ts` and `components/inline-formula-explain.tsx`):
+- POST endpoint accepting: `{ messages, latex, paperTitle, sectionContext }`
+- Concise 2–4 paragraph explanation of a single formula; no tools
+- Used when user clicks inline math in explanations (popover/sheet)
+- Stream response; fixed model (e.g. Claude Haiku 4.5) for speed
+
 **Difficulty Levels**:
 - **Basic**: Undergraduate level, everyday analogies, simple language, intuition over rigor
 - **Advanced** (default): College-level math, rigorous details, explain notation (∇, ∂, Σ, etc.), balance rigor with intuition
@@ -136,6 +143,7 @@ Paper: {
 
 **Markdown Rendering** (`components/markdown-content.tsx`):
 - Use `react-markdown` with `remark-math` and `rehype-katex`
+- Integrate `InlineFormulaExplain` so clicking inline math opens a popover with formula explanation (calls `/api/formula-explain`)
 - Custom prose styling class `.explanation-content` with:
   - Smaller font (13px) for readability
   - H2 with gradient background and left border
@@ -210,22 +218,24 @@ Paper: {
 
 ### Data Flow Summary
 
-1. **Upload**: User pastes URL or uploads file → convert to base64 → POST /api/parse-paper
-2. **Parse**: API fetches PDF → sends to LLM with schema → streams progress → returns Paper object
+1. **Upload**: User pastes URL or uploads file → convert to base64 → check IndexedDB cache (same PDF/URL) → if miss, POST /api/parse-paper?stream=true
+2. **Parse**: API fetches PDF (if URL) → sends to LLM with streamText + Output.object() → streams progress via partialOutputStream → returns Paper object → client stores in cache
 3. **Display**: Client stores paper → renders dual-panel view → enables interactions
-4. **Explain**: User clicks section → modal opens → POST /api/explain → streams explanation → renders markdown + math
-5. **Deep Dive**: User clicks equation → modal opens → POST /api/deep-dive → LLM calls Wolfram tool → streams results → renders pods
+4. **Explain**: User clicks section → modal opens → POST /api/explain → streams explanation → renders markdown + math (inline math clickable for formula-explain)
+5. **Formula Explain**: User clicks inline math in explanation → popover → POST /api/formula-explain → streams short explanation
+6. **Deep Dive**: User clicks equation → modal opens → POST /api/deep-dive → LLM calls Wolfram tool → streams results → renders pods
 
 ### File Structure
 
 ```
 app/
   api/
-    parse-paper/route.ts       # PDF parsing with LLM + streaming
+    parse-paper/route.ts       # PDF parsing with LLM + streaming (+ cache check on client)
     explain/route.ts           # Section explanation streaming
+    formula-explain/route.ts  # Inline formula quick explanations
     deep-dive/route.ts         # Wolfram Alpha tool-calling agent
   layout.tsx                   # Root layout with fonts
-  page.tsx                     # Main application
+  page.tsx                     # Main application (uses paper-cache for cache check/store)
   globals.css                  # Tailwind config + custom prose styles
 components/
   paper-upload-bar.tsx         # Upload interface + model selection
@@ -233,16 +243,20 @@ components/
   structured-view.tsx          # Right panel section list + TOC
   section-block.tsx            # Collapsible section cards
   explanation-modal.tsx        # Section explanation dialog
+  inline-formula-explain.tsx   # Inline formula popover (calls formula-explain API)
   deep-dive-modal.tsx          # Wolfram Alpha results dialog
   math-block.tsx               # KaTeX rendering + deep dive button
-  markdown-content.tsx         # Styled prose rendering
+  markdown-content.tsx         # Styled prose rendering (+ InlineFormulaExplain)
   paper-loading.tsx            # Loading state with status
   paper-empty-state.tsx        # Initial empty state
+  theme-provider.tsx           # Theme context
   ui/                          # shadcn/ui components (use existing)
 lib/
   paper-schema.ts              # Zod schemas for structured output
+  paper-cache.ts               # IndexedDB cache for parsed papers (getCachedPaper, setCachedPaper)
   prompts.ts                   # LLM prompt templates
   wolfram-alpha.ts             # Wolfram API integration
+  config.ts                    # API config (e.g. maxDuration)
   utils.ts                     # cn() and helpers
 ```
 
@@ -376,7 +390,7 @@ After implementation:
 Use this checklist to ensure all features are implemented:
 
 - [ ] Paper upload bar with URL and file inputs
-- [ ] Model selection dropdown (4 models)
+- [ ] Model selection dropdown (5 models: Haiku 4.5 default, Sonnet 4.5, GPT-4o, GPT-4o Mini, Opus 4)
 - [ ] PDF parsing API with SSE streaming
 - [ ] Zod schemas for structured output
 - [ ] Paragraph-level section extraction prompt
@@ -387,6 +401,7 @@ Use this checklist to ensure all features are implemented:
 - [ ] Explanation modal with streaming
 - [ ] Difficulty level selector
 - [ ] useChat integration for follow-up questions
+- [ ] Inline formula explain (formula-explain API + InlineFormulaExplain component)
 - [ ] Math block rendering with KaTeX
 - [ ] Deep dive button on equations
 - [ ] Wolfram Alpha API integration
@@ -395,6 +410,7 @@ Use this checklist to ensure all features are implemented:
 - [ ] Custom prose styling (13px, gradient headers, math backgrounds)
 - [ ] Loading states with status messages
 - [ ] Error handling and toasts
+- [ ] IndexedDB paper cache (getCachedPaper, setCachedPaper) for repeat analyses
 - [ ] Environment variable setup
 - [ ] README and documentation
 

@@ -113,17 +113,17 @@ When adding new features, follow this pattern:
 
 ### Streaming Structured Output
 
-The parse API now uses `streamObject` instead of `generateText`, which:
-- Streams results as they're generated (not blocking)
-- Shows real-time progress (sections extracted)
+The parse API uses `streamText()` with `Output.object()` and `partialOutputStream` (when `stream=true`), which:
+- Streams partial results as they're generated (not blocking)
+- Sends real-time progress events (sections extracted)
 - Provides better user feedback
 - Tests verify progress updates are sent correctly
 
 ### Caching
 
-Papers are cached in IndexedDB to avoid re-parsing:
-- Content hashed for cache key generation
-- Tests verify cache hit/miss behavior
+Papers are cached in the browser (IndexedDB via `lib/paper-cache.ts`) to avoid re-parsing:
+- Content (base64 or URL) is hashed for cache key generation
+- Tests verify cache hit/miss behavior and storage/retrieval
 - Logs added for debugging cache operations
 
 ## Continuous Testing

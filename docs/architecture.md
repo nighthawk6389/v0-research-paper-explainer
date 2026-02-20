@@ -31,16 +31,16 @@ Paper Explainer is a Next.js 16 application that uses large language models to p
 └─────────────────────────────────────────────────────────────┘
                              │
                  ┌───────────┼───────────┐
-                 │           │           │
-        ┌────────▼───┐  ┌───▼────┐  ┌──▼────────┐
-        │ /api/      │  │ /api/  │  │ /api/     │
-        │ parse-paper│  │ explain│  │ deep-dive │
-        └────────┬───┘  └───┬────┘  └──┬────────┘
-                 │          │           │
-                 │          │           │
-         ┌───────▼──────────▼───────────▼────────┐
+                 │           │           │           │
+        ┌────────▼───┐  ┌───▼────┐  ┌──▼────────────┐  ┌──▼────────┐
+        │ /api/      │  │ /api/  │  │ /api/         │  │ /api/     │
+        │ parse-paper│  │ explain│  │ formula-explain│  │ deep-dive │
+        └────────┬───┘  └───┬────┘  └──┬────────────┘  └──┬────────┘
+                 │          │           │                  │
+                 │          │           │                  │
+         ┌───────▼──────────▼───────────▼──────────────────▼────────┐
          │      Vercel AI Gateway / LLMs          │
-         │  (Claude Sonnet 4, GPT-4o, etc.)       │
+         │  (Claude Haiku/Sonnet 4.5, GPT-4o, etc.) │
          └────────────────┬────────────────────────┘
                           │
               ┌───────────▼──────────┐
@@ -83,8 +83,10 @@ User Action → Upload Bar Component
               ▼
         Client receives Paper object
               │
+              ├─ Check IndexedDB cache (same PDF/URL) → use cached paper if found
               ├─ Store in state
               ├─ Display in dual-panel view
+              ├─ Cache result in IndexedDB for next time
               └─ Enable section interactions
 ```
 
@@ -215,8 +217,9 @@ page.tsx
 │           └── MathBlock (with onDeepDive)
 ├── ExplanationModal
 │   ├── useChat hook
-│   ├── MarkdownContent
+│   ├── MarkdownContent (with InlineFormulaExplain for clickable math)
 │   └── Chat input
+├── InlineFormulaExplain (popover for inline formula explanations via /api/formula-explain)
 └── DeepDiveModal
     ├── useChat hook
     ├── Tool call rendering
@@ -260,7 +263,7 @@ State is passed down via props and callbacks flow up through the component tree.
 1. Accept PDF (base64 or URL) and model selection
 2. Download PDF if URL provided (with browser-like headers)
 3. Send progress events: "Downloading...", "Asking Claude...", "Claude is reading..."
-4. Call `generateText()` with `Output.object()` for structured extraction
+4. Call `streamText()` with `Output.object()` for structured extraction; stream progress via `partialOutputStream` as sections are parsed
 5. Stream complete event with Paper object
 
 **Why SSE?**: Parsing takes 30-60 seconds, so user needs feedback on progress
@@ -404,11 +407,15 @@ The application is designed for deployment on Vercel:
 - **Build Output**: Static assets + API routes
 - **CDN**: PDF worker and KaTeX styles served from CDN
 
+## Caching
+
+Parsed papers are cached in the browser using **IndexedDB** (`lib/paper-cache.ts`). When the user analyzes a PDF (by URL or upload), the app hashes the input and checks for an existing cached result. On cache hit, the paper loads immediately without calling the parse API. After a successful parse, the result is stored with the PDF data and model. Cache is keyed by content (base64 or URL) so the same paper re-analyzed returns the cached copy.
+
 ## Future Architecture Considerations
 
-1. **Database Integration**: Store parsed papers for reuse
+1. **Database Integration**: Store parsed papers server-side for reuse across users
 2. **User Authentication**: Save papers and preferences per user
-3. **Caching Layer**: Redis for frequently accessed papers
+3. **Server-Side Caching**: Redis or similar for frequently accessed papers (client-side IndexedDB caching is already implemented)
 4. **Vector Search**: Semantic search across paper sections
 5. **Batch Processing**: Queue system for multiple papers
 6. **Real-time Collaboration**: Share annotations and explanations
