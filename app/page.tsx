@@ -94,34 +94,71 @@ export default function Home() {
         const decoder = new TextDecoder()
         let buffer = ""
         let receivedComplete = false
+        let eventCount = { status: 0, complete: 0, error: 0, other: 0 }
+        let chunkIndex = 0
 
         while (true) {
           const { done, value } = await reader.read()
-          if (done) break
+          if (done) {
+            console.log("[v0] SSE stream ended", {
+              receivedComplete,
+              eventCount,
+              bufferLength: buffer.length,
+              remainingBuffer: buffer.slice(0, 200),
+            })
+            break
+          }
 
+          chunkIndex++
           buffer += decoder.decode(value, { stream: true })
           const lines = buffer.split("\n")
           buffer = lines.pop() || ""
 
-          for (const line of lines) {
+          if (lines.length > 0 && chunkIndex <= 3) {
+            console.log("[v0] SSE chunk", { chunkIndex, lineCount: lines.length, firstLine: lines[0]?.slice(0, 80) })
+          }
+
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i]
             if (line.startsWith("event:")) {
               const event = line.slice(6).trim()
-              const nextLine = lines[lines.indexOf(line) + 1]
-              if (nextLine?.startsWith("data:")) {
-                const data = JSON.parse(nextLine.slice(5).trim())
+              const nextLine = lines[i + 1]
+              if (!nextLine?.startsWith("data:")) {
+                console.warn("[v0] SSE event without data line", { event, nextLine: nextLine?.slice(0, 60), lineIndex: i })
+                eventCount.other++
+                continue
+              }
 
-                if (event === "status") {
-                  setLoadingStatus(data)
-                } else if (event === "complete") {
-                  receivedComplete = true
-                  console.log("[v0] Parse complete event received", {
-                    hasData: !!data,
-                    hasPaper: !!data?.paper,
-                    paperType: typeof data?.paper,
-                    hasSections: !!data?.paper?.sections,
-                    sectionsType: Array.isArray(data?.paper?.sections) ? "array" : typeof data?.paper?.sections,
-                    sectionsLength: data?.paper?.sections?.length,
-                  })
+              const rawData = nextLine.slice(5).trim()
+              let data: { paper?: Paper; fetchFailed?: boolean; error?: string; message?: string; detail?: string }
+              try {
+                data = JSON.parse(rawData) as typeof data
+              } catch (parseErr) {
+                console.error("[v0] SSE data parse failed", {
+                  event,
+                  rawDataSnippet: rawData.slice(0, 120),
+                  error: parseErr instanceof Error ? parseErr.message : String(parseErr),
+                })
+                if (event === "error") {
+                  throw new Error("Failed to parse paper")
+                }
+                eventCount.other++
+                continue
+              }
+
+              if (event === "status") {
+                eventCount.status++
+                if (eventCount.status <= 2 || data.message) {
+                  console.log("[v0] SSE status", { eventCount: eventCount.status, message: data.message, detail: data.detail })
+                }
+                setLoadingStatus(data)
+              } else if (event === "complete") {
+                eventCount.complete++
+                console.log("[v0] SSE complete received", {
+                  eventCount: eventCount.complete,
+                  hasPaper: !!data?.paper,
+                  sectionsLength: data?.paper?.sections?.length,
+                })
 
                   if (!data?.paper) {
                     console.error("[v0] Complete event has no paper data", { data })
@@ -135,15 +172,16 @@ export default function Home() {
                     throw new Error("Paper sections are not in the expected format")
                   }
 
+                  const validPaper = data.paper
                   console.log("[v0] Setting paper state", {
-                    title: data.paper.title,
-                    sections: data.paper.sections.length,
+                    title: validPaper.title,
+                    sections: validPaper.sections.length,
                   })
-                  setPaper(data.paper)
+                  setPaper(validPaper)
                   
                   // Cache the parsed paper using original upload data
                   await setCachedPaper(
-                    data.paper,
+                    validPaper,
                     uploadData.pdfBase64 || "",
                     uploadData.url || null,
                     selectedModel
@@ -152,12 +190,15 @@ export default function Home() {
                   })
                   
                   toast.success("Paper analyzed successfully", {
-                    description: `Found ${data.paper.sections.length} sections`,
+                    description: `Found ${validPaper.sections.length} sections`,
                   })
+                  receivedComplete = true
                   setIsLoading(false)
                   setLoadingStatus(null)
                   return
                 } else if (event === "error") {
+                  eventCount.error++
+                  console.log("[v0] SSE error received", { eventCount: eventCount.error, fetchFailed: data.fetchFailed, error: data.error })
                   if (data.fetchFailed) {
                     setError(null)
                     setShowUploadHint(true)
@@ -172,6 +213,9 @@ export default function Home() {
                   setIsLoading(false)
                   setLoadingStatus(null)
                   return
+                } else {
+                  eventCount.other++
+                  console.warn("[v0] SSE unknown event type", { event, keys: data ? Object.keys(data).slice(0, 5) : [] })
                 }
               }
             }
@@ -180,6 +224,7 @@ export default function Home() {
 
         // If stream ended without receiving a complete event, it likely timed out
         if (!receivedComplete) {
+          console.error("[v0] Stream ended without complete — throwing timeout", { eventCount, receivedComplete })
           throw new Error(
             "Paper analysis timed out. The paper may be too large or complex. Try using a faster model like Claude Haiku 4.5, or try again later."
           )
