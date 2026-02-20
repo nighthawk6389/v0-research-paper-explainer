@@ -105,13 +105,22 @@ async function readParseStream(response: Response, callbacks: StreamCallbacks): 
         const event = line.slice(6).trim()
         const nextLine = lines[i + 1]
         if (!nextLine?.startsWith("data:")) {
+          if (event === "complete") {
+            receivedComplete = true
+          }
           console.warn("[v0] SSE event without data line", { event, nextLine: nextLine?.slice(0, 60), lineIndex: i })
           eventCount.other++
           continue
         }
 
         const data = parseSseData(nextLine.slice(5).trim(), event, eventCount)
-        if (!data) continue
+        if (!data) {
+          if (event === "complete") {
+            receivedComplete = true
+            throw new Error("Parse completed but no paper data received")
+          }
+          continue
+        }
 
         if (event === "status") {
           eventCount.status++
