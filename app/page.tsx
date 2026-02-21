@@ -9,6 +9,7 @@ import { DeepDiveModal } from "@/components/deep-dive-modal"
 import { PaperLoading } from "@/components/paper-loading"
 import { PaperEmptyState } from "@/components/paper-empty-state"
 import { getCachedPaper, setCachedPaper } from "@/lib/paper-cache"
+import { readParseStream } from "@/lib/sse-stream"
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -16,155 +17,6 @@ import {
 } from "@/components/ui/resizable"
 import { Toaster, toast } from "sonner"
 import type { Paper, Section } from "@/lib/paper-schema"
-
-interface SseEventData {
-  paper?: Paper
-  fetchFailed?: boolean
-  error?: string
-  message?: string
-  detail?: string
-}
-
-type SseEventCount = { status: number; complete: number; error: number; other: number }
-
-function parseSseData(rawData: string, event: string, eventCount: SseEventCount): SseEventData | null {
-  try {
-    return JSON.parse(rawData) as SseEventData
-  } catch (parseErr) {
-    console.error("[v0] SSE data parse failed", {
-      event,
-      rawDataSnippet: rawData.slice(0, 120),
-      error: parseErr instanceof Error ? parseErr.message : String(parseErr),
-    })
-    if (event === "error") {
-      throw new Error("Failed to parse paper")
-    }
-    eventCount.other++
-    return null
-  }
-}
-
-function validatePaper(data: SseEventData): Paper {
-  if (!data?.paper) {
-    console.error("[v0] Complete event has no paper data", { data })
-    throw new Error("Parse completed but no paper data received")
-  }
-  if (!Array.isArray(data.paper.sections)) {
-    console.error("[v0] Paper sections is not an array", {
-      sectionsType: typeof data.paper.sections,
-    })
-    throw new Error("Paper sections are not in the expected format")
-  }
-  return data.paper
-}
-
-interface StreamCallbacks {
-  onStatus: (data: SseEventData) => void
-  onComplete: (paper: Paper) => Promise<void>
-  onFetchError: () => void
-}
-
-async function readParseStream(response: Response, callbacks: StreamCallbacks): Promise<void> {
-  if (!response.body) {
-    throw new Error("Failed to start analysis")
-  }
-
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ""
-  let receivedComplete = false
-  const eventCount: SseEventCount = { status: 0, complete: 0, error: 0, other: 0 }
-  let chunkIndex = 0
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) {
-        console.log("[v0] SSE stream ended", {
-          receivedComplete,
-          eventCount,
-          bufferLength: buffer.length,
-          remainingBuffer: buffer.slice(0, 200),
-        })
-        break
-      }
-
-      chunkIndex++
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split("\n")
-      buffer = lines.pop() || ""
-
-      if (lines.length > 0 && chunkIndex <= 3) {
-        console.log("[v0] SSE chunk", { chunkIndex, lineCount: lines.length, firstLine: lines[0]?.slice(0, 80) })
-      }
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i]
-        if (!line.startsWith("event:")) continue
-
-        const event = line.slice(6).trim()
-        const nextLine = lines[i + 1]
-        if (!nextLine?.startsWith("data:")) {
-          if (event === "complete") {
-            receivedComplete = true
-          }
-          console.warn("[v0] SSE event without data line", { event, nextLine: nextLine?.slice(0, 60), lineIndex: i })
-          eventCount.other++
-          continue
-        }
-
-        const data = parseSseData(nextLine.slice(5).trim(), event, eventCount)
-        if (!data) {
-          if (event === "complete") {
-            receivedComplete = true
-            throw new Error("Parse completed but no paper data received")
-          }
-          continue
-        }
-
-        if (event === "status") {
-          eventCount.status++
-          if (eventCount.status <= 2 || data.message) {
-            console.log("[v0] SSE status", { eventCount: eventCount.status, message: data.message, detail: data.detail })
-          }
-          callbacks.onStatus(data)
-        } else if (event === "complete") {
-          eventCount.complete++
-          console.log("[v0] SSE complete received", {
-            eventCount: eventCount.complete,
-            hasPaper: !!data?.paper,
-            sectionsLength: data?.paper?.sections?.length,
-          })
-          const paper = validatePaper(data)
-          console.log("[v0] Setting paper state", { title: paper.title, sections: paper.sections.length })
-          await callbacks.onComplete(paper)
-          receivedComplete = true
-          return
-        } else if (event === "error") {
-          eventCount.error++
-          console.log("[v0] SSE error received", { eventCount: eventCount.error, fetchFailed: data.fetchFailed, error: data.error })
-          if (data.fetchFailed) {
-            callbacks.onFetchError()
-            return
-          }
-          throw new Error(data.error || "Failed to parse paper")
-        } else {
-          eventCount.other++
-          console.warn("[v0] SSE unknown event type", { event, keys: Object.keys(data).slice(0, 5) })
-        }
-      }
-    }
-
-    if (!receivedComplete) {
-      console.error("[v0] Stream ended without complete — throwing timeout", { eventCount, receivedComplete })
-      throw new Error(
-        "Paper analysis timed out. The paper may be too large or complex. Try using a faster model like Claude Haiku 4.5, or try again later."
-      )
-    }
-  } finally {
-    reader.releaseLock()
-  }
-}
 
 export default function Home() {
   const [paper, setPaper] = useState<Paper | null>(null)
@@ -234,7 +86,10 @@ export default function Home() {
         }
 
         await readParseStream(response, {
-          onStatus: (data) => setLoadingStatus(data),
+          onStatus: (data) => setLoadingStatus({
+            message: data.message || "Processing...",
+            detail: data.detail,
+          }),
           onComplete: async (validPaper) => {
             setPaper(validPaper)
             await setCachedPaper(

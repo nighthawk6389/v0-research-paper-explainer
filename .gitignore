@@ -3,8 +3,30 @@ __v0_runtime_loader.js
 __v0_devtools.tsx
 __v0_jsx-dev-runtime.ts
 
-# Common ignores
+# Dependencies
 node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+
+# npm
+npm-debug.log*
+npm-error.log*
+
+# pnpm
+pnpm-debug.log*
+
+# Next.js
 .next/
+out/
+
+# Environment
 .env*.local
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Misc
+*.tgz
+.npm/
+.cache/

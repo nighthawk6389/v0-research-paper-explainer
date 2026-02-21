@@ -11,8 +11,9 @@ describe('Paper Schema', () => {
         {
           id: 'section-0',
           heading: 'Introduction',
+          type: 'text',
           content: [
-            { type: 'text', text: 'Introduction text' },
+            { type: 'text', value: 'Introduction text', label: null, isInline: null },
           ],
           pageNumbers: [1],
         },
@@ -32,10 +33,11 @@ describe('Paper Schema', () => {
         {
           id: 'section-1',
           heading: 'Equations',
+          type: 'math',
           content: [
-            { type: 'text', text: 'Consider the equation:' },
-            { type: 'math', latex: 'E = mc^2', isInline: false },
-            { type: 'text', text: 'This is famous.' },
+            { type: 'text', value: 'Consider the equation:', label: null, isInline: null },
+            { type: 'math', value: 'E = mc^2', isInline: false, label: null },
+            { type: 'text', value: 'This is famous.', label: null, isInline: null },
           ],
           pageNumbers: [2],
         },
@@ -77,8 +79,9 @@ describe('Paper Schema', () => {
         {
           id: 'section-1',
           heading: 'Math',
+          type: 'math',
           content: [
-            { type: 'math', latex: 'x^2', isInline: true },
+            { type: 'math', value: 'x^2', isInline: true, label: null },
           ],
           pageNumbers: [1],
         },
@@ -98,8 +101,9 @@ describe('Paper Schema', () => {
         {
           id: 'section-1',
           heading: 'Equations',
+          type: 'math',
           content: [
-            { type: 'math', latex: 'E = mc^2', isInline: false, label: '(1)' },
+            { type: 'math', value: 'E = mc^2', isInline: false, label: '(1)' },
           ],
           pageNumbers: [1],
         },
@@ -126,7 +130,8 @@ describe('Paper Schema', () => {
         {
           id: 'section-1',
           heading: 'Long Section',
-          content: [{ type: 'text', text: 'Content' }],
+          type: 'text',
+          content: [{ type: 'text', value: 'Content', label: null, isInline: null }],
           pageNumbers: [1, 2, 3],
         },
       ],

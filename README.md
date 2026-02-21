@@ -28,29 +28,65 @@ Paper Explainer uses large language models to parse academic PDFs and provide in
 - **Styling**: Tailwind CSS v4
 - **External APIs**: Wolfram Alpha Full Results API
 
-## Getting Started
+## Running Locally
 
 ### Prerequisites
 
-- Node.js 18+ and pnpm
-- Vercel AI Gateway access (or direct LLM API keys)
-- Wolfram Alpha App ID (free tier: 2,000 queries/month)
+- **Node.js 18+** ([nodejs.org](https://nodejs.org/) or via `nvm`)
+- **pnpm** (recommended) or **npm**
+  - Install pnpm: `npm install -g pnpm`
+- For full functionality: **LLM API access** (Vercel AI Gateway or direct API keys) and optionally a **Wolfram Alpha App ID** (free tier: 2,000 queries/month)
 
-### Installation
+**No Node.js yet?** (e.g. fresh WSL) Install [nvm](https://github.com/nvm-sh/nvm), then run `nvm install --lts` and `npm install -g pnpm`. In a new terminal, `node` and `pnpm` will be available.
+
+### Setup and run
+
+1. **Install dependencies**
+
+   ```bash
+   pnpm install
+   ```
+
+   If you don’t use pnpm:
+
+   ```bash
+   npm install
+   ```
+
+2. **Environment variables (optional)**
+
+   Copy the example env file and add any keys you need:
+
+   ```bash
+   cp .env.example .env.local
+   ```
+
+   Edit `.env.local`:
+
+   - **Wolfram Alpha** (for Deep Dive math): set `WOLFRAM_ALPHA_APP_ID`. Get an App ID at [developer.wolframalpha.com](https://developer.wolframalpha.com/).
+   - **LLM providers** (for local dev): if you’re not using Vercel AI Gateway, set `ANTHROPIC_API_KEY` and/or `OPENAI_API_KEY` for the models you use.
+
+   The app can run without `.env.local`; parsing and explanations will work if your deployment or environment provides the AI provider keys (e.g. via Vercel).
+
+3. **Start the development server**
+
+   ```bash
+   pnpm dev
+   ```
+
+   Or with npm:
+
+   ```bash
+   npm run dev
+   ```
+
+4. Open **http://localhost:3000** in your browser.
+
+### Production build (optional)
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd paper-explainer
-
-# Install dependencies
-pnpm install
-
-# Set up environment variables
-# WOLFRAM_ALPHA_APP_ID=your_app_id_here
-
-# Run development server
-pnpm dev
+pnpm build
+pnpm start
 ```
 
 Visit `http://localhost:3000` to use the application.
@@ -184,14 +220,13 @@ AI agent with Wolfram Alpha tool-calling for mathematical analysis.
 
 ## Environment Variables
 
-```bash
-# Required for Wolfram Alpha integration
-WOLFRAM_ALPHA_APP_ID=your_app_id
+Use `.env.local` for local development (see [Running locally](#running-locally)). A template is provided in `.env.example`.
 
-# Optional: Direct LLM API keys (if not using Vercel AI Gateway)
-# OPENAI_API_KEY=...
-# ANTHROPIC_API_KEY=...
-```
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `WOLFRAM_ALPHA_APP_ID` | No | Wolfram Alpha App ID for Deep Dive math (get one at [developer.wolframalpha.com](https://developer.wolframalpha.com/)) |
+| `ANTHROPIC_API_KEY` | For local LLM | Anthropic API key when not using Vercel AI Gateway |
+| `OPENAI_API_KEY` | For local LLM | OpenAI API key when not using Vercel AI Gateway |
 
 ## Performance Considerations
 

@@ -199,7 +199,7 @@ export async function POST(req: Request) {
                 model: `${modelName} (${selectedModel})`,
                 prompt: PARSE_PAPER_PROMPT,
               };
-              console.log(debugObj)
+              console.log(debugObj.detail)
               send("status", debugObj)
             }
           }

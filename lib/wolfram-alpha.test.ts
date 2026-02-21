@@ -1,12 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { queryWolframAlpha } from './wolfram-alpha'
 
-// Mock the fetch function
-global.fetch = vi.fn()
+const originalFetch = global.fetch
 
 describe('Wolfram Alpha', () => {
   beforeEach(() => {
-    vi.resetAllMocks()
+    global.fetch = vi.fn()
+    process.env.WOLFRAM_ALPHA_APP_ID = 'test-app-id'
+  })
+
+  afterEach(() => {
+    global.fetch = originalFetch
+    delete process.env.WOLFRAM_ALPHA_APP_ID
   })
 
   it('should successfully query Wolfram Alpha API', async () => {
@@ -122,15 +127,12 @@ describe('Wolfram Alpha', () => {
     expect(result.pods[0].subpods[0].img?.src).toBe('https://example.com/plot.png')
   })
 
-  it('should handle missing WOLFRAM_APP_ID', async () => {
-    const originalAppId = process.env.WOLFRAM_APP_ID
-    delete process.env.WOLFRAM_APP_ID
+  it('should handle missing WOLFRAM_ALPHA_APP_ID', async () => {
+    delete process.env.WOLFRAM_ALPHA_APP_ID
 
     const result = await queryWolframAlpha('test query')
 
     expect(result.success).toBe(false)
-    expect(result.error).toContain('WOLFRAM_APP_ID')
-
-    process.env.WOLFRAM_APP_ID = originalAppId
+    expect(result.error).toContain('WOLFRAM_ALPHA_APP_ID')
   })
 })
