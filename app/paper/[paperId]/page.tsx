@@ -11,7 +11,9 @@ import {
 } from "@/lib/storage/db"
 import { compressPaperForPrompt } from "@/lib/paper-utils"
 import type { Paper, Section } from "@/lib/paper-schema"
+import type { Artifact } from "@/lib/storage/types"
 import { Toaster, toast } from "sonner"
+import { ArtifactViewerModal } from "@/components/artifact-viewer-modal"
 
 export default function PaperViewPage() {
   const params = useParams()
@@ -36,6 +38,7 @@ export default function PaperViewPage() {
   const [deepDiveSection, setDeepDiveSection] = useState<Section | null>(null)
   const [isDeepDiveOpen, setIsDeepDiveOpen] = useState(false)
   const [isGeneratingArtifact, setIsGeneratingArtifact] = useState(false)
+  const [openArtifact, setOpenArtifact] = useState<Artifact | null>(null)
 
   useEffect(() => {
     if (!paperId) {
@@ -283,12 +286,17 @@ export default function PaperViewPage() {
           onGenerateSummary={handleGenerateSummary}
           onGenerateSlides={handleGenerateSlides}
           onGenerateFlashcards={handleGenerateFlashcards}
-          onOpenArtifact={() => {}}
+          onOpenArtifact={setOpenArtifact}
           isGeneratingArtifact={isGeneratingArtifact}
           initialConversationId={openConversationId}
           initialMessages={openConversationMessages ?? undefined}
         />
       </div>
+
+      <ArtifactViewerModal
+        artifact={openArtifact}
+        onClose={() => setOpenArtifact(null)}
+      />
     </div>
   )
 }

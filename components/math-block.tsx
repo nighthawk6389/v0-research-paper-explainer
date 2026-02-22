@@ -55,9 +55,9 @@ export function MathBlock({
 
   if (displayMode) {
     return (
-      <div className={`group/math relative my-3 ${className}`}>
+      <div className={`group/math relative my-3 min-w-0 max-w-full ${className}`}>
         <div
-          className="overflow-x-auto py-3 px-4 bg-muted/40 rounded-md"
+          className="overflow-x-auto overflow-y-hidden py-3 px-4 bg-muted/40 rounded-md min-w-0"
           dangerouslySetInnerHTML={{ __html: html }}
         />
         {label && (
@@ -71,7 +71,7 @@ export function MathBlock({
               e.stopPropagation()
               onDeepDive(latex)
             }}
-            className="absolute top-1.5 right-1.5 flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200 opacity-0 group-hover/math:opacity-100 transition-opacity hover:bg-orange-200 dark:hover:bg-orange-800"
+            className="absolute top-1.5 right-1.5 flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200 hover:bg-orange-200 dark:hover:bg-orange-800"
             title={deepDiveLabel || "Deep dive with Wolfram Alpha"}
           >
             <Sigma className="size-3" />

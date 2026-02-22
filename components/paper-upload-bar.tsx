@@ -83,12 +83,6 @@ export function PaperUploadBar({ onAnalyze, isLoading, showUploadHint }: PaperUp
         className="flex items-center gap-3 px-4 py-3 max-w-screen-2xl mx-auto"
       >
         <div className="flex items-center gap-3 shrink-0">
-          <div className="flex items-center gap-2">
-            <FileText className="size-5 text-foreground" />
-            <span className="font-semibold text-sm hidden sm:inline">
-              Paper Explainer
-            </span>
-          </div>
           <Select value={model} onValueChange={setModel} disabled={isLoading}>
             <SelectTrigger className="h-8 text-xs w-[180px]">
               <SelectValue />

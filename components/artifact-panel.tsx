@@ -77,7 +77,7 @@ export function ArtifactPanel({
                 key={a.artifactId}
                 type="button"
                 onClick={() => onOpenArtifact(a)}
-                className="w-full text-left px-3 py-2 rounded-md text-sm hover:bg-muted transition-colors border"
+                className="w-full text-left px-3 py-2 rounded-md text-sm hover:bg-muted transition-colors border cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <span className="font-medium capitalize">{a.artifactType}</span>
                 <span className="text-xs text-muted-foreground block mt-0.5">

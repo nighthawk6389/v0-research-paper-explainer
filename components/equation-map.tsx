@@ -82,8 +82,8 @@ export function EquationMap({
                       key={eq.equationId}
                       className="border rounded-md p-3 bg-card hover:bg-muted/30 transition-colors"
                     >
-                      <div className="flex items-start gap-2">
-                        <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 min-w-0 overflow-x-auto">
                           <MathBlock
                             latex={eq.latex}
                             displayMode

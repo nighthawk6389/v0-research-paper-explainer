@@ -18,6 +18,8 @@ import { compressPaperForPrompt } from "@/lib/paper-utils"
 import { readParseStream } from "@/lib/sse-stream"
 import { Toaster, toast } from "sonner"
 import type { Paper, Section } from "@/lib/paper-schema"
+import type { Artifact } from "@/lib/storage/types"
+import { ArtifactViewerModal } from "@/components/artifact-viewer-modal"
 
 export default function Home() {
   const [paper, setPaper] = useState<Paper | null>(null)
@@ -39,6 +41,7 @@ export default function Home() {
   const [isDeepDiveOpen, setIsDeepDiveOpen] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>("anthropic/claude-haiku-4.5")
   const [isGeneratingArtifact, setIsGeneratingArtifact] = useState(false)
+  const [openArtifact, setOpenArtifact] = useState<Artifact | null>(null)
   const [loadingStatus, setLoadingStatus] = useState<{
     message: string
     detail?: string
@@ -353,7 +356,7 @@ export default function Home() {
             onGenerateSummary={handleGenerateSummary}
             onGenerateSlides={handleGenerateSlides}
             onGenerateFlashcards={handleGenerateFlashcards}
-            onOpenArtifact={() => {}}
+            onOpenArtifact={setOpenArtifact}
             isGeneratingArtifact={isGeneratingArtifact}
             initialConversationId={openConversationId}
             initialMessages={openConversationMessages ?? undefined}
@@ -367,6 +370,11 @@ export default function Home() {
           <p className="text-xs text-destructive/80 mt-0.5">{error}</p>
         </div>
       )}
+
+      <ArtifactViewerModal
+        artifact={openArtifact}
+        onClose={() => setOpenArtifact(null)}
+      />
     </div>
   )
 }

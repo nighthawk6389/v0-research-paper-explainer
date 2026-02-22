@@ -13,7 +13,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { Button } from "@/components/ui/button"
-import { ChevronDown, ChevronRight } from "lucide-react"
+import { ChevronRight, Users } from "lucide-react"
 
 export const PERSONA_OPTIONS = [
   "High-school student",
@@ -60,9 +60,12 @@ export function PersonaGoalSelector({
         <Button
           variant="ghost"
           size="sm"
-          className="w-full justify-between text-xs text-muted-foreground hover:text-foreground"
+          className="w-full justify-between text-xs bg-muted/60 hover:bg-muted border border-border/60 text-foreground"
         >
-          <span>Customize audience & goal</span>
+          <span className="flex items-center gap-2">
+            <Users className="size-3.5 text-muted-foreground" />
+            Customize audience & goal
+          </span>
           <ChevronRight className="size-3.5 data-[state=open]:rotate-90" />
         </Button>
       </CollapsibleTrigger>
