@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo } from "react"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { MathBlock } from "@/components/math-block"
 import { extractEquations } from "@/lib/paper-utils"
@@ -59,7 +58,7 @@ export function EquationMap({
           Equations
         </span>
       </div>
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-y-auto min-h-0">
         <div className="p-3 space-y-4">
           {sectionsWithEquations.map((section) => {
             const equations = equationsBySection.get(section.id) ?? []
@@ -82,33 +81,35 @@ export function EquationMap({
                       key={eq.equationId}
                       className="border rounded-md p-3 bg-card hover:bg-muted/30 transition-colors"
                     >
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 min-w-0 overflow-x-auto">
-                          <MathBlock
-                            latex={eq.latex}
-                            displayMode
-                            label={eq.label ?? undefined}
-                            className="text-sm"
-                            onDeepDive={
-                              onDeepDive
-                                ? () => onDeepDive(eq.latex, section)
-                                : undefined
-                            }
-                            deepDiveLabel="Deep Dive"
-                          />
-                        </div>
-                        {onExplainEquation && (
+                      {/* Full-width scrollable equation row */}
+                      <div className="w-full overflow-x-auto">
+                        <MathBlock
+                          latex={eq.latex}
+                          displayMode
+                          label={eq.label ?? undefined}
+                          className="text-sm"
+                          onDeepDive={
+                            onDeepDive
+                              ? () => onDeepDive(eq.latex, section)
+                              : undefined
+                          }
+                          deepDiveLabel="Deep Dive"
+                        />
+                      </div>
+                      {/* Explain button below equation */}
+                      {onExplainEquation && (
+                        <div className="flex justify-end mt-1.5">
                           <Button
                             variant="outline"
                             size="sm"
-                            className="shrink-0 h-8 text-xs gap-1"
+                            className="h-7 text-xs gap-1"
                             onClick={() => onExplainEquation(eq, section)}
                           >
                             <MessageSquare className="size-3" />
                             Explain
                           </Button>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -116,7 +117,7 @@ export function EquationMap({
             )
           })}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   )
 }

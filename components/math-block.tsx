@@ -55,9 +55,9 @@ export function MathBlock({
 
   if (displayMode) {
     return (
-      <div className={`group/math relative my-3 min-w-0 max-w-full ${className}`}>
+      <div className={`group/math relative my-2 ${className}`}>
         <div
-          className="overflow-x-auto overflow-y-hidden py-3 px-4 bg-muted/40 rounded-md min-w-0"
+          className="py-3 px-4 bg-muted/40 rounded-md"
           dangerouslySetInnerHTML={{ __html: html }}
         />
         {label && (

@@ -75,6 +75,24 @@ export async function POST(req: Request) {
         hasError: !!result.error,
       })
       
+      const images = result.pods
+        .flatMap((p) => p.subpods)
+        .filter((s) => s.img)
+        .map((s) => ({
+          title: s.title,
+          src: s.img!.src,
+          alt: s.img!.alt,
+          width: s.img!.width,
+          height: s.img!.height,
+        }))
+
+      console.log("[v0] Wolfram tool returning:", {
+        success: result.success,
+        podCount: result.pods.length,
+        imageCount: images.length,
+        imageSrcs: images.map(i => i.src.substring(0, 60)),
+      })
+
       return {
         query,
         purpose,
@@ -82,15 +100,9 @@ export async function POST(req: Request) {
         inputInterpretation: result.inputInterpretation,
         markdown: formatWolframResultAsMarkdown(result),
         error: result.error,
-        // Include image URLs for pods that have them
-        images: result.pods
-          .flatMap((p) => p.subpods)
-          .filter((s) => s.img)
-          .map((s) => ({
-            title: s.title,
-            src: s.img!.src,
-            alt: s.img!.alt,
-          })),
+        images,
+        // Also include raw pods for richer display
+        pods: result.pods,
       }
     },
   })

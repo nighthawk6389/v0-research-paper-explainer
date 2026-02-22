@@ -46,16 +46,31 @@ export async function queryWolframAlpha(
     appid: appId,
     format: "plaintext,image",
     output: "json",
-    podtimeout: "8",
-    scantimeout: "5",
+    // Increased timeouts so plots have time to render
+    podtimeout: "15",
+    scantimeout: "10",
+    parsetimeout: "10",
+    totaltimeout: "30",
+    // Request image dimensions
+    width: "600",
+    maxwidth: "800",
+    plotwidth: "600",
   })
 
+  const apiUrl = `https://api.wolframalpha.com/v2/query?${params.toString()}`
+  const startTime = Date.now()
+  console.log("[wolfram] Querying Wolfram Alpha:", { input: input.substring(0, 80) })
+
   try {
-    const response = await fetch(
-      `https://api.wolframalpha.com/v2/query?${params.toString()}`
-    )
+    const response = await fetch(apiUrl, {
+      // Server-side fetch — no CORS concerns here
+      headers: {
+        "User-Agent": "PaperExplainer/1.0",
+      },
+    })
 
     if (!response.ok) {
+      console.error("[wolfram] API HTTP error:", response.status, response.statusText)
       return {
         success: false,
         inputInterpretation: null,
@@ -66,6 +81,11 @@ export async function queryWolframAlpha(
 
     const data = await response.json()
     const queryResult = data.queryresult
+    console.log("[wolfram] Raw response summary:", {
+      success: queryResult?.success,
+      numpods: queryResult?.numpods,
+      duration: `${Date.now() - startTime}ms`,
+    })
 
     if (!queryResult || queryResult.success === false) {
       // Try to get didyoumeans
@@ -82,18 +102,29 @@ export async function queryWolframAlpha(
 
     const pods: WolframPod[] = (queryResult.pods || []).map((pod: any) => ({
       title: pod.title,
-      subpods: (pod.subpods || []).map((sub: any) => ({
-        title: sub.title || "",
-        plaintext: sub.plaintext || null,
-        img: sub.img
-          ? {
-              src: sub.img.src,
-              alt: sub.img.alt || "",
-              width: parseInt(sub.img.width) || 300,
-              height: parseInt(sub.img.height) || 100,
-            }
-          : null,
-      })),
+      subpods: (pod.subpods || []).map((sub: any) => {
+        const hasImg = !!sub.img?.src
+        if (hasImg) {
+          console.log("[wolfram] Pod image found:", {
+            podTitle: pod.title,
+            imgSrc: sub.img.src?.substring(0, 80),
+            width: sub.img.width,
+            height: sub.img.height,
+          })
+        }
+        return {
+          title: sub.title || "",
+          plaintext: sub.plaintext || null,
+          img: sub.img?.src
+            ? {
+                src: sub.img.src,
+                alt: sub.img.alt || pod.title || "",
+                width: parseInt(sub.img.width) || 400,
+                height: parseInt(sub.img.height) || 200,
+              }
+            : null,
+        }
+      }),
     }))
 
     // Find input interpretation
@@ -102,6 +133,13 @@ export async function queryWolframAlpha(
     )
     const inputInterpretation =
       inputPod?.subpods[0]?.plaintext || null
+
+    const imageCount = pods.flatMap(p => p.subpods).filter(s => s.img).length
+    console.log("[wolfram] Result processed:", {
+      podCount: pods.length,
+      imageCount,
+      duration: `${Date.now() - startTime}ms`,
+    })
 
     return {
       success: true,

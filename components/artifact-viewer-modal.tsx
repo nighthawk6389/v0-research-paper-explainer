@@ -1,16 +1,17 @@
 "use client"
 
+import { useState, useCallback } from "react"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { Button } from "@/components/ui/button"
 import ReactMarkdown from "react-markdown"
 import type { Components } from "react-markdown"
 import type { Artifact } from "@/lib/storage/types"
-import { FileText, Presentation, Layers } from "lucide-react"
+import { FileText, Presentation, Layers, Download, Loader2 } from "lucide-react"
 
 interface ArtifactViewerModalProps {
   artifact: Artifact | null
@@ -76,9 +77,39 @@ function SlidesView({
   title: string
   slides: Array<{ title: string; bullets: string[]; speakerNotes?: string }>
 }) {
+  const [isDownloading, setIsDownloading] = useState(false)
+
+  const handleDownloadPptx = useCallback(async () => {
+    setIsDownloading(true)
+    try {
+      const { generatePptx } = await import("@/lib/generate-pptx")
+      await generatePptx(title, slides)
+    } catch (err) {
+      console.error("PPTX generation failed:", err)
+    } finally {
+      setIsDownloading(false)
+    }
+  }, [title, slides])
+
   return (
     <div className="space-y-4 pb-4">
-      <h2 className="text-xl font-bold">{title}</h2>
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="text-xl font-bold">{title}</h2>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleDownloadPptx}
+          disabled={isDownloading}
+          className="shrink-0 gap-1.5"
+        >
+          {isDownloading ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <Download className="size-3.5" />
+          )}
+          {isDownloading ? "Generating…" : "Download PPTX"}
+        </Button>
+      </div>
       {slides.map((slide, i) => (
         <div key={i} className="border rounded-lg p-5 space-y-3 bg-muted/20">
           <div className="flex items-center gap-2">
@@ -96,7 +127,7 @@ function SlidesView({
           )}
           {slide.speakerNotes && (
             <p className="text-xs text-muted-foreground italic border-t pt-2 mt-2">
-              {slide.speakerNotes}
+              🗒 {slide.speakerNotes}
             </p>
           )}
         </div>

@@ -183,6 +183,20 @@ export function DeepDiveModal({
     )
   }
 
+  // Proxy Wolfram Alpha image URLs through our server to avoid CORS issues
+  function proxyWolframUrl(src: string): string {
+    if (!src) return src
+    try {
+      const u = new URL(src)
+      if (u.hostname === "api.wolframalpha.com") {
+        return `/api/wolfram-image?url=${encodeURIComponent(src)}`
+      }
+    } catch {
+      // not a URL, return as-is
+    }
+    return src
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="max-w-[90vw] w-full h-[85vh] flex flex-col p-0 gap-0">
@@ -316,7 +330,7 @@ export function DeepDiveModal({
                                   {/* Show images in a grid */}
                                   {output.images && output.images.length > 0 && (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                      {output.images.map((img, imgIdx) => (
+                                      {output.images.map((img: { src: string; alt: string; title?: string }, imgIdx: number) => (
                                         <div
                                           key={imgIdx}
                                           className="flex flex-col gap-1.5"
@@ -326,12 +340,22 @@ export function DeepDiveModal({
                                               {img.title}
                                             </div>
                                           )}
-                                          <div className="bg-white dark:bg-gray-800 rounded-lg border p-2 flex items-center justify-center">
+                                          <div className="bg-white dark:bg-gray-800 rounded-lg border p-2 flex items-center justify-center min-h-[80px]">
                                             <img
-                                              src={img.src}
+                                              src={proxyWolframUrl(img.src)}
                                               alt={img.alt}
                                               className="max-w-full h-auto"
-                                              crossOrigin="anonymous"
+                                              onError={(e) => {
+                                                console.warn("[wolfram-img] Failed to load image:", img.src)
+                                                ;(e.target as HTMLImageElement).style.display = "none"
+                                                const parent = (e.target as HTMLImageElement).parentElement
+                                                if (parent) {
+                                                  parent.innerHTML = `<span class="text-xs text-muted-foreground italic">Image unavailable</span>`
+                                                }
+                                              }}
+                                              onLoad={() => {
+                                                console.log("[wolfram-img] Image loaded:", img.src.substring(0, 60))
+                                              }}
                                             />
                                           </div>
                                         </div>
@@ -358,12 +382,18 @@ export function DeepDiveModal({
                                                 </p>
                                               )}
                                               {subpod.img && (
-                                                <div className="bg-white dark:bg-gray-900 rounded border p-2 flex items-center justify-center">
+                                                <div className="bg-white dark:bg-gray-900 rounded border p-2 flex items-center justify-center min-h-[60px]">
                                                   <img
-                                                    src={subpod.img.src}
+                                                    src={proxyWolframUrl(subpod.img.src)}
                                                     alt={subpod.img.alt || pod.title}
                                                     className="max-w-full h-auto"
-                                                    crossOrigin="anonymous"
+                                                    onError={(e) => {
+                                                      console.warn("[wolfram-img] Pod image failed:", subpod.img?.src)
+                                                      ;(e.target as HTMLImageElement).style.display = "none"
+                                                    }}
+                                                    onLoad={() => {
+                                                      console.log("[wolfram-img] Pod image loaded:", subpod.img?.src?.substring(0, 60))
+                                                    }}
                                                   />
                                                 </div>
                                               )}
