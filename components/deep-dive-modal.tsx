@@ -16,6 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { MarkdownContent } from "@/components/markdown-content"
 import { MathBlock } from "@/components/math-block"
+import { proxyWolframUrl } from "@/lib/wolfram-proxy"
 import {
   Send,
   Loader2,
@@ -181,20 +182,6 @@ export function DeepDiveModal({
       (p): p is Extract<(typeof message.parts)[0], { type: "tool-invocation" }> =>
         p.type === "tool-invocation"
     )
-  }
-
-  // Proxy Wolfram Alpha image URLs through our server to avoid CORS issues
-  function proxyWolframUrl(src: string): string {
-    if (!src) return src
-    try {
-      const u = new URL(src)
-      if (u.hostname === "api.wolframalpha.com") {
-        return `/api/wolfram-image?url=${encodeURIComponent(src)}`
-      }
-    } catch {
-      // not a URL, return as-is
-    }
-    return src
   }
 
   return (
