@@ -31,3 +31,19 @@ export const paperSchema = z.object({
 export type ContentBlock = z.infer<typeof contentBlockSchema>
 export type Section = z.infer<typeof sectionSchema>
 export type Paper = z.infer<typeof paperSchema>
+
+/** Display equation extracted from paper (for Equation Map). equationId matches blockId. */
+export interface Equation {
+  equationId: string
+  latex: string
+  label: string | null
+  sectionId: string
+  sectionHeading: string
+  pageNumbers: number[]
+}
+
+export interface PaperStats {
+  numSections: number
+  numParagraphs: number
+  numEquations: number
+}

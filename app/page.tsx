@@ -1,48 +1,49 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback } from "react"
 import { PaperUploadBar } from "@/components/paper-upload-bar"
-import { PdfViewer } from "@/components/pdf-viewer"
-import { StructuredView } from "@/components/structured-view"
-import { ExplanationModal } from "@/components/explanation-modal"
-import { DeepDiveModal } from "@/components/deep-dive-modal"
+import { PaperWorkspace } from "@/components/paper-workspace"
 import { PaperLoading } from "@/components/paper-loading"
 import { PaperEmptyState } from "@/components/paper-empty-state"
-import { getCachedPaper, setCachedPaper } from "@/lib/paper-cache"
-import { readParseStream } from "@/lib/sse-stream"
 import {
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle,
-} from "@/components/ui/resizable"
+  getPaperIdFromUpload,
+  getPaper,
+  savePaper,
+  buildPaperRecord,
+  blobToBase64,
+  saveArtifact,
+  buildArtifact,
+} from "@/lib/storage/db"
+import { compressPaperForPrompt } from "@/lib/paper-utils"
+import { readParseStream } from "@/lib/sse-stream"
 import { Toaster, toast } from "sonner"
 import type { Paper, Section } from "@/lib/paper-schema"
 
 export default function Home() {
   const [paper, setPaper] = useState<Paper | null>(null)
+  const [paperId, setPaperId] = useState<string | null>(null)
   const [pdfBase64, setPdfBase64] = useState<string | null>(null)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [hoveredSection, setHoveredSection] = useState<string | null>(null)
   const [selectedSection, setSelectedSection] = useState<Section | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [openConversationId, setOpenConversationId] = useState<string | null>(null)
+  const [openConversationMessages, setOpenConversationMessages] = useState<
+    Array<{ role: "user" | "assistant"; content: string }> | null
+  >(null)
   const [error, setError] = useState<string | null>(null)
   const [showUploadHint, setShowUploadHint] = useState(false)
   const [deepDiveLatex, setDeepDiveLatex] = useState<string | null>(null)
   const [deepDiveSection, setDeepDiveSection] = useState<Section | null>(null)
   const [isDeepDiveOpen, setIsDeepDiveOpen] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>("anthropic/claude-haiku-4.5")
+  const [isGeneratingArtifact, setIsGeneratingArtifact] = useState(false)
   const [loadingStatus, setLoadingStatus] = useState<{
     message: string
     detail?: string
     model?: string
   } | null>(null)
-
-  const highlightedPage = useMemo(() => {
-    if (!hoveredSection || !paper) return null
-    const section = paper.sections.find((s) => s.id === hoveredSection)
-    return section?.pageNumbers[0] ?? null
-  }, [hoveredSection, paper])
 
   const handleAnalyze = useCallback(
     async (uploadData: { pdfBase64?: string; url?: string; pdfBlob?: Blob; model: string }) => {
@@ -62,11 +63,21 @@ export default function Home() {
       }
 
       try {
-        const cached = await getCachedPaper(uploadData.pdfBase64, uploadData.url)
-        if (cached) {
-          setPaper(cached.paper)
-          toast.success("Loaded from cache", {
-            description: `${cached.paper.title} - ${cached.paper.sections.length} sections`,
+        const id = await getPaperIdFromUpload(uploadData.pdfBlob, uploadData.url)
+        const existing = await getPaper(id)
+        if (existing) {
+          setPaperId(id)
+          setPaper(existing.paperData)
+          if (existing.pdfBlob) {
+            const dataUrl = await blobToBase64(existing.pdfBlob)
+            setPdfBase64(dataUrl.replace(/^data:application\/pdf;base64,/, ""))
+            setPdfUrl(existing.pdfUrl ?? null)
+          } else {
+            setPdfBase64(null)
+            setPdfUrl(existing.pdfUrl ?? null)
+          }
+          toast.success("Loaded from library", {
+            description: `${existing.title} - ${existing.paperData.sections.length} sections`,
           })
           return
         }
@@ -86,23 +97,32 @@ export default function Home() {
         }
 
         await readParseStream(response, {
-          onStatus: (data) => setLoadingStatus({
-            message: data.message || "Processing...",
-            detail: data.detail,
-          }),
+          onStatus: (data) =>
+            setLoadingStatus({
+              message: data.message || "Processing...",
+              detail: data.detail,
+            }),
           onComplete: async (validPaper) => {
+            const id = await getPaperIdFromUpload(uploadData.pdfBlob, uploadData.url)
+            setPaperId(id)
             setPaper(validPaper)
-            await setCachedPaper(
-              validPaper,
-              uploadData.pdfBase64 || "",
-              uploadData.url || null,
-              uploadData.model
-            ).catch((err) => {
-              console.error("[v0] Failed to cache paper:", err)
+            const pdfBlob = uploadData.pdfBlob
+            const record = buildPaperRecord(id, validPaper, {
+              pdfBlob,
+              pdfUrl: uploadData.url ?? null,
+              source: uploadData.url ? { type: "url", value: uploadData.url } : { type: "upload" },
             })
-            toast.success("Paper analyzed successfully", {
-              description: `Found ${validPaper.sections.length} sections`,
-            })
+            try {
+              await savePaper(record)
+              toast.success("Paper analyzed and saved", {
+                description: `Found ${validPaper.sections.length} sections. Saved to Library.`,
+              })
+            } catch (err) {
+              console.error("[v0] Failed to save paper:", err)
+              toast.error("Saved locally but failed to add to Library", {
+                description: err instanceof Error ? err.message : "Unknown error",
+              })
+            }
           },
           onFetchError: () => {
             setError(null)
@@ -128,11 +148,156 @@ export default function Home() {
 
   const handleSectionClick = useCallback((section: Section) => {
     setSelectedSection(section)
+    setOpenConversationId(null)
+    setOpenConversationMessages(null)
     setIsModalOpen(true)
   }, [])
 
+  const handleGenerateSummary = useCallback(
+    async (opts: { persona?: { persona?: string; goal?: string; tone?: string } }) => {
+      if (!paper || !paperId) return
+      setIsGeneratingArtifact(true)
+      try {
+        const paperText = compressPaperForPrompt(paper, "summary")
+        const res = await fetch("/api/generate-summary", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            paperText,
+            persona: opts.persona?.persona,
+            goal: opts.persona?.goal,
+            tone: opts.persona?.tone,
+          }),
+        })
+        if (!res.ok) throw new Error("Failed to generate summary")
+        const markdown = await res.text()
+        const artifact = buildArtifact(
+          paperId,
+          "summary",
+          {
+            persona: opts.persona?.persona,
+            goal: opts.persona?.goal,
+            tone: opts.persona?.tone,
+          },
+          { type: "summary", markdown }
+        )
+        await saveArtifact(artifact)
+        toast.success("Summary saved")
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Failed to generate summary")
+      } finally {
+        setIsGeneratingArtifact(false)
+      }
+    },
+    [paper, paperId]
+  )
+
+  const handleGenerateSlides = useCallback(
+    async (opts: {
+      persona?: { persona?: string; goal?: string; tone?: string }
+      slideCount?: number
+    }) => {
+      if (!paper || !paperId) return
+      setIsGeneratingArtifact(true)
+      try {
+        const paperText = compressPaperForPrompt(paper, "slides")
+        const res = await fetch("/api/generate-slides", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            paperText,
+            persona: opts.persona?.persona,
+            goal: opts.persona?.goal,
+            tone: opts.persona?.tone,
+            slideCount: opts.slideCount ?? 6,
+          }),
+        })
+        if (!res.ok) throw new Error("Failed to generate slides")
+        const data = await res.json()
+        const artifact = buildArtifact(
+          paperId,
+          "slides",
+          {
+            persona: opts.persona?.persona,
+            goal: opts.persona?.goal,
+            tone: opts.persona?.tone,
+            slideCount: opts.slideCount ?? 6,
+          },
+          { type: "slides", title: data.title, slides: data.slides }
+        )
+        await saveArtifact(artifact)
+        toast.success("Slides saved")
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Failed to generate slides")
+      } finally {
+        setIsGeneratingArtifact(false)
+      }
+    },
+    [paper, paperId]
+  )
+
+  const handleGenerateFlashcards = useCallback(
+    async (opts: {
+      persona?: { persona?: string; goal?: string; tone?: string }
+      count?: number
+    }) => {
+      if (!paper || !paperId) return
+      setIsGeneratingArtifact(true)
+      try {
+        const paperText = compressPaperForPrompt(paper, "flashcards")
+        const res = await fetch("/api/generate-flashcards", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            paperText,
+            persona: opts.persona?.persona,
+            goal: opts.persona?.goal,
+            tone: opts.persona?.tone,
+            flashcardCount: opts.count ?? 12,
+          }),
+        })
+        if (!res.ok) throw new Error("Failed to generate flashcards")
+        const data = await res.json()
+        const artifact = buildArtifact(
+          paperId,
+          "flashcards",
+          {
+            persona: opts.persona?.persona,
+            goal: opts.persona?.goal,
+            tone: opts.persona?.tone,
+            flashcardCount: opts.count ?? 12,
+          },
+          { type: "flashcards", cards: data.cards }
+        )
+        await saveArtifact(artifact)
+        toast.success("Flashcards saved")
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Failed to generate flashcards")
+      } finally {
+        setIsGeneratingArtifact(false)
+      }
+    },
+    [paper, paperId]
+  )
+
+  const handleOpenConversation = useCallback(
+    (
+      _conversation: { conversationId: string; messages: Array<{ role: "user" | "assistant"; content: string }> },
+      section: Section | null
+    ) => {
+      if (!section) return
+      setSelectedSection(section)
+      setOpenConversationId(_conversation.conversationId)
+      setOpenConversationMessages(_conversation.messages)
+      setIsModalOpen(true)
+    },
+    []
+  )
+
   const handleModalClose = useCallback(() => {
     setIsModalOpen(false)
+    setOpenConversationId(null)
+    setOpenConversationMessages(null)
     setTimeout(() => setSelectedSection(null), 300)
   }, [])
 
@@ -150,23 +315,17 @@ export default function Home() {
     }, 300)
   }, [])
 
-  const deepDiveSectionContext = useMemo(() => {
-    if (!deepDiveSection) return ""
-    return deepDiveSection.content
-      .map((block) => {
-        if (block.type === "math") return `$$${block.value}$$`
-        return block.value
-      })
-      .join("\n\n")
-  }, [deepDiveSection])
-
   const hasPaper = paper !== null
 
   return (
-    <div className="flex flex-col h-dvh overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden">
       <Toaster position="top-right" />
 
-      <PaperUploadBar onAnalyze={handleAnalyze} isLoading={isLoading} showUploadHint={showUploadHint} />
+      <PaperUploadBar
+        onAnalyze={handleAnalyze}
+        isLoading={isLoading}
+        showUploadHint={showUploadHint}
+      />
 
       <main className="flex-1 min-h-0">
         {isLoading ? (
@@ -174,52 +333,37 @@ export default function Home() {
         ) : !hasPaper ? (
           <PaperEmptyState />
         ) : (
-          <ResizablePanelGroup direction="horizontal">
-            <ResizablePanel defaultSize={50} minSize={30}>
-              <PdfViewer
-                pdfData={pdfBase64}
-                pdfUrl={pdfUrl}
-                highlightedPage={highlightedPage}
-              />
-            </ResizablePanel>
-
-            <ResizableHandle withHandle />
-
-            <ResizablePanel defaultSize={50} minSize={30}>
-              <StructuredView
-                paper={paper}
-                hoveredSection={hoveredSection}
-                onSectionHover={setHoveredSection}
-                onSectionClick={handleSectionClick}
-                onDeepDive={handleDeepDive}
-              />
-            </ResizablePanel>
-          </ResizablePanelGroup>
+          <PaperWorkspace
+            paper={paper}
+            pdfData={pdfBase64}
+            pdfUrl={pdfUrl}
+            hoveredSection={hoveredSection}
+            onSectionHover={setHoveredSection}
+            selectedSection={selectedSection}
+            onSectionClick={handleSectionClick}
+            isExplainOpen={isModalOpen}
+            onExplainClose={handleModalClose}
+            deepDiveLatex={deepDiveLatex}
+            deepDiveSection={deepDiveSection}
+            onDeepDive={handleDeepDive}
+            onDeepDiveClose={handleDeepDiveClose}
+            onExplainEquation={(_, section) => handleSectionClick(section)}
+            paperId={paperId ?? undefined}
+            onOpenConversation={handleOpenConversation}
+            onGenerateSummary={handleGenerateSummary}
+            onGenerateSlides={handleGenerateSlides}
+            onGenerateFlashcards={handleGenerateFlashcards}
+            onOpenArtifact={() => {}}
+            isGeneratingArtifact={isGeneratingArtifact}
+            initialConversationId={openConversationId}
+            initialMessages={openConversationMessages ?? undefined}
+          />
         )}
       </main>
 
-      <ExplanationModal
-        section={selectedSection}
-        paperTitle={paper?.title || ""}
-        paperAbstract={paper?.abstract || ""}
-        allSections={paper?.sections || []}
-        isOpen={isModalOpen}
-        onClose={handleModalClose}
-      />
-
-      <DeepDiveModal
-        latex={deepDiveLatex}
-        sectionContext={deepDiveSectionContext}
-        paperTitle={paper?.title || ""}
-        isOpen={isDeepDiveOpen}
-        onClose={handleDeepDiveClose}
-      />
-
       {error && !isLoading && (
         <div className="absolute bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-destructive/10 border border-destructive/20 rounded-lg p-3">
-          <p className="text-sm text-destructive font-medium">
-            Analysis Error
-          </p>
+          <p className="text-sm text-destructive font-medium">Analysis Error</p>
           <p className="text-xs text-destructive/80 mt-0.5">{error}</p>
         </div>
       )}

@@ -32,8 +32,11 @@ import {
   MessageSquare,
   ArrowDown,
 } from "lucide-react"
+import { PersonaGoalSelector, type PersonaGoalValue } from "@/components/persona-goal-selector"
 import type { Section } from "@/lib/paper-schema"
 import type { DifficultyLevel } from "@/lib/prompts"
+import { saveConversation } from "@/lib/storage/db"
+import type { ConversationAnchor } from "@/lib/storage/types"
 
 interface ExplanationModalProps {
   section: Section | null
@@ -42,6 +45,11 @@ interface ExplanationModalProps {
   allSections: Section[]
   isOpen: boolean
   onClose: () => void
+  /** When set, conversations are persisted and initial state can be loaded */
+  paperId?: string
+  blockIds?: Record<string, string[]>
+  initialConversationId?: string
+  initialMessages?: Array<{ role: "user" | "assistant"; content: string }>
 }
 
 function buildSectionContentText(section: Section): string {
@@ -65,6 +73,10 @@ function renderTextWithInlineMath(text: string) {
   })
 }
 
+function toUIMessage(m: { role: "user" | "assistant"; content: string }, i: number) {
+  return { id: `msg-${i}`, role: m.role, parts: [{ type: "text" as const, text: m.content }] }
+}
+
 export function ExplanationModal({
   section,
   paperTitle,
@@ -72,14 +84,20 @@ export function ExplanationModal({
   allSections,
   isOpen,
   onClose,
+  paperId,
+  blockIds,
+  initialConversationId,
+  initialMessages,
 }: ExplanationModalProps) {
   const [input, setInput] = useState("")
   const [difficultyLevel, setDifficultyLevel] =
     useState<DifficultyLevel>("advanced")
+  const [personaGoal, setPersonaGoal] = useState<PersonaGoalValue>({})
   const scrollRef = useRef<HTMLDivElement>(null)
   const hasInitiatedRef = useRef(false)
   const currentSectionIdRef = useRef<string | null>(null)
   const currentDifficultyRef = useRef<DifficultyLevel>("advanced")
+  const lastSavedCountRef = useRef(0)
   const [expandedFormula, setExpandedFormula] = useState<string | null>(null)
   const [isUserScrolledUp, setIsUserScrolledUp] = useState(false)
   const [showScrollButton, setShowScrollButton] = useState(false)
@@ -115,6 +133,8 @@ export function ExplanationModal({
     return `explain-${section?.id || "default"}`
   }, [section?.id])
 
+  const chatId = initialConversationId ?? stableId
+
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -129,6 +149,9 @@ export function ExplanationModal({
             sectionContent: sectionContentText,
             previousSectionsContext,
             difficultyLevel,
+            persona: personaGoal.persona,
+            goal: personaGoal.goal,
+            tone: personaGoal.tone,
           },
         }),
       }),
@@ -139,11 +162,14 @@ export function ExplanationModal({
       sectionContentText,
       previousSectionsContext,
       difficultyLevel,
+      personaGoal.persona,
+      personaGoal.goal,
+      personaGoal.tone,
     ]
   )
 
   const { messages, sendMessage, status, setMessages } = useChat({
-    id: stableId,
+    id: chatId,
     transport,
   })
 
@@ -153,10 +179,18 @@ export function ExplanationModal({
     if (isOpen && section && section.id !== currentSectionIdRef.current) {
       currentSectionIdRef.current = section.id
       hasInitiatedRef.current = false
-      setMessages([])
+      lastSavedCountRef.current = 0
+      if (!initialMessages?.length) setMessages([])
       setExpandedFormula(null)
     }
-  }, [isOpen, section, setMessages])
+  }, [isOpen, section, setMessages, initialMessages?.length])
+
+  useEffect(() => {
+    if (isOpen && section && initialMessages?.length && currentSectionIdRef.current === section.id) {
+      setMessages(initialMessages.map(toUIMessage))
+      hasInitiatedRef.current = true
+    }
+  }, [isOpen, section?.id, initialMessages, setMessages])
 
   useEffect(() => {
     if (
@@ -164,7 +198,8 @@ export function ExplanationModal({
       section &&
       !hasInitiatedRef.current &&
       messages.length === 0 &&
-      currentSectionIdRef.current === section.id
+      currentSectionIdRef.current === section.id &&
+      !initialMessages?.length
     ) {
       hasInitiatedRef.current = true
       currentDifficultyRef.current = difficultyLevel
@@ -172,7 +207,7 @@ export function ExplanationModal({
         text: `Please explain this section to me. Break it down so someone with college-level math can understand it.`,
       })
     }
-  }, [isOpen, section, messages.length, sendMessage, difficultyLevel])
+  }, [isOpen, section, messages.length, sendMessage, difficultyLevel, initialMessages?.length])
 
   useEffect(() => {
     if (
@@ -186,6 +221,54 @@ export function ExplanationModal({
       hasInitiatedRef.current = false
     }
   }, [difficultyLevel, isOpen, section, setMessages])
+
+  const getMessageText = useCallback((message: (typeof messages)[0]): string => {
+    if (!message.parts || !Array.isArray(message.parts)) return ""
+    return message.parts
+      .filter(
+        (p): p is { type: "text"; text: string } => p.type === "text"
+      )
+      .map((p) => p.text)
+      .join("")
+  }, [messages])
+
+  useEffect(() => {
+    if (
+      !paperId ||
+      !section ||
+      status === "streaming" ||
+      status === "submitted" ||
+      messages.length === 0
+    )
+      return
+    if (messages.length <= lastSavedCountRef.current) return
+    lastSavedCountRef.current = messages.length
+    const anchor: ConversationAnchor = {
+      type: "section",
+      sectionId: section.id,
+      pageNumbers: section.pageNumbers,
+    }
+    const conversation = {
+      conversationId: chatId,
+      paperId,
+      anchor,
+      difficulty: difficultyLevel,
+      persona: personaGoal.persona || personaGoal.goal || personaGoal.tone
+        ? { persona: personaGoal.persona, goal: personaGoal.goal, tone: personaGoal.tone }
+        : undefined,
+      title: section.heading,
+      messages: messages.map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: getMessageText(m),
+        createdAt: Date.now(),
+      })),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
+    saveConversation(conversation).catch((e) =>
+      console.warn("[ExplanationModal] Failed to save conversation:", e)
+    )
+  }, [paperId, section, chatId, difficultyLevel, personaGoal, messages, status, getMessageText])
 
   // Detect when user manually scrolls up
   useEffect(() => {
@@ -250,16 +333,6 @@ export function ExplanationModal({
     onClose()
   }, [onClose])
 
-  function getMessageText(message: (typeof messages)[0]): string {
-    if (!message.parts || !Array.isArray(message.parts)) return ""
-    return message.parts
-      .filter(
-        (p): p is { type: "text"; text: string } => p.type === "text"
-      )
-      .map((p) => p.text)
-      .join("")
-  }
-
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="max-w-[98vw] w-full h-[92vh] flex flex-col p-0 gap-0">
@@ -271,34 +344,41 @@ export function ExplanationModal({
         </DialogDescription>
 
         {/* Header */}
-        <div className="px-5 pt-4 pb-3 border-b shrink-0 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 min-w-0">
-            <BookOpen className="size-4 text-muted-foreground shrink-0" />
-            <h2 className="text-sm font-semibold leading-tight truncate">
-              {section?.heading || "Section"}
-            </h2>
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="flex items-center gap-2">
-              <GraduationCap className="size-3.5 text-muted-foreground" />
-              <Select
-                value={difficultyLevel}
-                onValueChange={(v) =>
-                  setDifficultyLevel(v as DifficultyLevel)
-                }
-                disabled={isStreaming}
-              >
-                <SelectTrigger className="h-7 text-xs w-[120px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="basic">Basic</SelectItem>
-                  <SelectItem value="advanced">Advanced</SelectItem>
-                  <SelectItem value="phd">PhD Level</SelectItem>
-                </SelectContent>
-              </Select>
+        <div className="px-5 pt-4 pb-3 border-b shrink-0 space-y-2">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 min-w-0">
+              <BookOpen className="size-4 text-muted-foreground shrink-0" />
+              <h2 className="text-sm font-semibold leading-tight truncate">
+                {section?.heading || "Section"}
+              </h2>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <GraduationCap className="size-3.5 text-muted-foreground" />
+                <Select
+                  value={difficultyLevel}
+                  onValueChange={(v) =>
+                    setDifficultyLevel(v as DifficultyLevel)
+                  }
+                  disabled={isStreaming}
+                >
+                  <SelectTrigger className="h-7 text-xs w-[120px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="basic">Basic</SelectItem>
+                    <SelectItem value="advanced">Advanced</SelectItem>
+                    <SelectItem value="phd">PhD Level</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
+          <PersonaGoalSelector
+            value={personaGoal}
+            onChange={setPersonaGoal}
+            disabled={isStreaming}
+          />
         </div>
 
         {/* Split layout: Left = section text, Right = explanation */}

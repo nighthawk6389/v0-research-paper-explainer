@@ -23,12 +23,18 @@ export async function POST(req: Request) {
     sectionContext,
     paperTitle,
     model,
+    persona,
+    goal,
+    tone,
   }: {
     messages: UIMessage[]
     latex: string
     sectionContext: string
     paperTitle: string
     model?: string
+    persona?: string
+    goal?: string
+    tone?: string
   } = await req.json()
 
   console.log("[v0] Deep-dive request started", {
@@ -127,7 +133,7 @@ IMPORTANT FORMATTING RULES:
 - Use ## for section headers, and ensure there's a blank line before and after headers.
 - When transitioning between topics, use clear section breaks with headers.
 
-Be thorough but accessible. Aim for "aha!" moments where computation illuminates theory.`
+Be thorough but accessible. Aim for "aha!" moments where computation illuminates theory.${[persona, goal, tone].filter(Boolean).length ? `\n\nAUDIENCE/GOAL: ${persona ? `Explain for "${persona}". ` : ""}${goal ? `Goal: ${goal}. ` : ""}${tone ? `Tone: ${tone}.` : ""}` : ""}`
 
   const selectedModel = model || "anthropic/claude-haiku-4.5"
   console.log("[v0] Using model:", selectedModel)

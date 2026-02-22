@@ -30,3 +30,6 @@ Thumbs.db
 *.tgz
 .npm/
 .cache/
+
+# Cursor IDE
+.cursor/

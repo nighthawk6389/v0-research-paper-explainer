@@ -24,11 +24,39 @@ pnpm test:coverage
 
 # Run specific test file
 pnpm test paper-cache.test.ts
+
+# Integration tests (require dev server on localhost:3000)
+npm run test:integration              # parse-paper SSE with example PDFs
+npm run test:integration:artifacts    # generate-summary, generate-slides, generate-flashcards
 ```
 
 ## Test Structure
 
 ### Unit Tests
+
+#### Hash (`lib/hash.test.ts`)
+- SHA-256 for string and ArrayBuffer
+- Deterministic and distinct hashes
+
+#### Paper utils (`lib/paper-utils.test.ts`)
+- `enrichPaperWithBlockIds`, `extractEquations`, `getPaperStats`, `compressPaperForPrompt`
+- Equation extraction excludes inline math; summary/slides/flashcards modes
+
+#### Storage (`lib/storage/db.test.ts`)
+- Paper and conversation and artifact CRUD (save, get, list, delete)
+- `getPaperIdFromUpload`, `blobToBase64`, `buildPaperRecord`, `buildArtifact`
+- Uses fake-indexeddb (vitest setup)
+
+#### Prompts (`lib/prompts.test.ts`)
+- `buildExplainSystemPrompt` with difficulty and persona/goal/tone
+
+#### Persona selector (`components/persona-goal-selector.test.tsx`)
+- PERSONA_OPTIONS, GOAL_OPTIONS, TONE_OPTIONS match feature plan
+
+#### Artifact API routes
+- `app/api/generate-summary/route.test.ts` — stream response, persona in prompt
+- `app/api/generate-slides/route.test.ts` — JSON title/slides, slideCount
+- `app/api/generate-flashcards/route.test.ts` — JSON cards, flashcardCount
 
 #### Paper Cache (`lib/paper-cache.test.ts`)
 Tests for IndexedDB-based paper caching:

@@ -1,0 +1,445 @@
+You are an expert Next.js + TypeScript engineer. Work inside this repo.
+
+Goal: Implement 5 major features end-to-end, using ONLY local browser storage for persistence (IndexedDB via the `idb` npm package; localStorage ok only for tiny prefs). Do not add authentication or any server DB. Keep existing UX patterns (App Router, streaming API calls, current PDF viewer + right panel sections + modal explain flow). Use clean, maintainable code. Add types and minimal tests where easy.
+
+FEATURES TO IMPLEMENT:
+1) Local "Library" that saves analyzed papers (metadata + parsed structure + PDF blob) in the browser.
+2) Save explanation conversations (per paper, per section/equation, per difficulty/model) locally in the browser.
+3) "Equation Map" view: extract/display all equations from the already-parsed paper data; enable explain + deep-dive actions.
+4) "Explain the paper to a specific person" mode: persona + goal driven explanations and summaries.
+5) Generate derived artifacts from a paper: (a) summary, (b) slide deck outline, (c) flashcards.
+
+CONSTRAINTS / NON-GOALS:
+- No server-side DB, no accounts.
+- Must work offline AFTER a paper is analyzed (i.e., can view saved paper + saved explanations). Artifact generation still needs the LLM APIs (existing routes).
+- Don't break current analyze flow, section list, or explain modal.
+- Keep performance acceptable for large PDFs: avoid re-parsing when loading from library.
+
+IMPORTANT — EXISTING CODEBASE CONTEXT:
+- lib/paper-cache.ts has an existing IndexedDB database ("paper-cache") with a "papers" store keyed by sha256 hash. It stores { hash, paper, pdfBase64, pdfUrl, timestamp, model }. This must be REPLACED (not duplicated) by the new storage module, with a migration path.
+- lib/paper-schema.ts defines the Paper/Section/ContentBlock Zod schemas. ContentBlock has { type, value, label, isInline } but NO id field.
+- The existing explain modal uses `useChat` from @ai-sdk/react, which manages a message array internally.
+- app/page.tsx already calls setCachedPaper() after successful parse (line 95-101). This must be updated to use the new storage API.
+
+--------------------------------------------------------------------------------
+A) DATA MODEL + STORAGE
+
+Install the `idb` npm package (tiny promise-based IndexedDB wrapper, <3KB gzipped).
+Create a single storage module: lib/storage/db.ts
+
+This module REPLACES lib/paper-cache.ts entirely. On first load, run a one-time
+migration: read all entries from the old "paper-cache" DB, convert them to the
+new schema, write them into the new DB, then delete the old DB.
+
+DB name: "paper-explainer"
+DB version: 1 (bump on schema changes; use idb's upgrade callback for migrations)
+
+Object stores and types:
+
+1) papers
+- keyPath: "paperId"
+- indexes: byCreatedAt (on "createdAt"), byTitle (on "title")
+- value:
+  {
+    paperId: string,               // sha256 of raw PDF ArrayBuffer; fallback: sha256 of URL
+    createdAt: number,
+    updatedAt: number,
+    title: string,
+    authors?: string[],
+    year?: string,
+    source?: { type: "upload"|"url", value?: string },
+    pdfBlob?: Blob,                // raw PDF binary (NOT base64 — saves ~33% space)
+    pdfUrl?: string,               // original URL if provided
+    parseVersion: number,          // bump if schema changes
+    paperData: Paper,              // the parsed structure from /api/parse-paper (paperSchema)
+    blockIds: Record<string, string[]>,  // sectionId -> array of block IDs for that section
+    stats: { numSections: number, numParagraphs: number, numEquations: number }
+  }
+
+  Note on blockIds: Since ContentBlock in paper-schema.ts has no id field,
+  generate deterministic IDs at save time via enrichPaperWithBlockIds(paper):
+    blockId = `${sectionId}-block-${index}` (e.g., "section-3-block-2")
+  Store the mapping in the paper record so anchoring works.
+
+  Note on pdfBlob: The existing cache stores pdfBase64 (string). The new store
+  uses Blob for efficiency. Add a helper blobToBase64(blob: Blob): Promise<string>
+  for when the PDF viewer needs base64. The PaperUploadBar already provides pdfBlob
+  in its upload data — use it directly.
+
+2) conversations (merges the old plan's "explanations" + "threads" into one store)
+- keyPath: "conversationId"
+- indexes: byPaperId (on "paperId"), byAnchor (on "anchor.sectionId"), byCreatedAt (on "createdAt")
+- value:
+  {
+    conversationId: string,        // uuid
+    paperId: string,
+    anchor: {
+      type: "section"|"paragraph"|"equation",
+      sectionId: string,
+      blockId?: string,            // content block ID for paragraph/equation-level anchoring
+      pageNumbers?: number[]
+    },
+    difficulty: "basic"|"advanced"|"phd",
+    model?: string,
+    persona?: {
+      persona?: string,            // e.g., "undergrad CS", "PM", "clinician"
+      goal?: string,               // e.g., "implement", "review", "teach"
+      tone?: string                // optional (friendly, concise, etc.)
+    },
+    title?: string,                // auto-generated short label from first assistant message
+    messages: Array<{
+      role: "user"|"assistant",
+      content: string,
+      createdAt: number,
+      model?: string
+    }>,
+    createdAt: number,
+    updatedAt: number
+  }
+
+  Rationale: useChat already manages a single message array. The first assistant
+  message IS the explanation; follow-ups are subsequent messages. This simplifies
+  loading saved conversations back into useChat via initialMessages.
+
+3) artifacts
+- keyPath: "artifactId"
+- indexes: byPaperId (on "paperId"), byType (on "content.type"), byCreatedAt (on "createdAt")
+- value:
+  {
+    artifactId: string,            // uuid
+    paperId: string,
+    params: {
+      persona?: string,
+      goal?: string,
+      tone?: string,
+      difficulty?: "basic"|"advanced"|"phd",
+      slideCount?: number,
+      flashcardCount?: number
+    },
+    content:
+      | { type: "summary", markdown: string }
+      | { type: "slides", title: string, slides: Array<{ title: string, bullets: string[], speakerNotes?: string }> }
+      | { type: "flashcards", cards: Array<{ front: string, back: string, tags?: string[], difficulty?: "easy"|"medium"|"hard" }> },
+    createdAt: number,
+    updatedAt: number
+  }
+
+  Note: content uses a discriminated union (no `any`). Each variant is fully typed.
+
+No "highlights" store for now. Add highlightId to anchors only when PDF text
+selection is actually implemented.
+
+Implement:
+- computePaperId(pdfArrayBuffer?: ArrayBuffer, url?: string) -> sha256 string.
+  Standardize on sha256 of raw PDF ArrayBuffer (not base64 string).
+  Fallback for URL-only: sha256 of URL string.
+- enrichPaperWithBlockIds(paper: Paper) -> Record<string, string[]>
+  Generates deterministic block IDs for each content block.
+- blobToBase64(blob: Blob) -> Promise<string>
+  For PDF viewer compatibility.
+- Migration from old "paper-cache" DB on first open.
+
+Expose these storage APIs (all async, using idb):
+- savePaper(paperRecord) -> Promise<void>
+- listPapers() -> Promise<PaperRecord[]>
+- getPaper(paperId) -> Promise<PaperRecord | undefined>
+- deletePaper(paperId) -> Promise<void>  (cascades: deletes related conversations + artifacts)
+- saveConversation(conversation) -> Promise<void>
+- getConversation(conversationId) -> Promise<Conversation | undefined>
+- listConversations(paperId, filters?) -> Promise<Conversation[]>
+- saveArtifact(artifact) -> Promise<void>
+- getArtifact(artifactId) -> Promise<Artifact | undefined>
+- listArtifacts(paperId, typeFilter?) -> Promise<Artifact[]>
+- deleteArtifact(artifactId) -> Promise<void>
+
+Also add lib/hash.ts:
+- sha256(data: ArrayBuffer | string) -> Promise<string>
+  Uses crypto.subtle.digest, returns hex string.
+
+--------------------------------------------------------------------------------
+B) UI / PAGES
+
+0) Add shared navigation: components/app-header.tsx
+- Shared header across all pages with links: Home (analyze new paper), Library.
+- When viewing a saved paper, show the paper title as breadcrumb.
+- Include in app/layout.tsx so it appears on every page.
+
+1) Add a Library page: app/library/page.tsx
+- Shows saved papers (title, authors, date saved, stats).
+- Client-side search/filter.
+- Actions:
+  - Open: navigates to /paper/[paperId]
+  - Delete (with confirmation)
+
+2) Add paper viewer route: app/paper/[paperId]/page.tsx
+- Loads paper from IndexedDB by paperId.
+- Renders the same viewer UI as the main page.
+- If pdfBlob is stored: convert to base64 via blobToBase64() for PdfViewer.
+  If not stored: show "PDF not available — re-upload to view PDF" but still
+  show parsed sections + saved conversations.
+- Must NOT call /api/parse-paper when loading a saved paper.
+
+IMPORTANT — avoid code duplication:
+- Extract the paper viewer into a shared components/paper-workspace.tsx that
+  accepts { paper, pdfData, pdfUrl, handlers }. Both app/page.tsx (live analyze
+  mode) and app/paper/[paperId]/page.tsx (library mode) compose this component
+  with different data sources.
+
+3) Integrate auto-save into existing analyze flow in app/page.tsx:
+- After a successful /api/parse-paper completion, persist automatically using
+  the new savePaper() API (replacing the old setCachedPaper call).
+- Update the existing "Paper analyzed successfully" toast to mention it's saved.
+- Do NOT add a separate "Saved to Library" toast. Only toast on save failure.
+
+4) Add "Saved Conversations" panel:
+- On paper view pages (both main and /paper/[paperId]), add a tab or collapsible section
+  in the right panel:
+  - "Conversations" list with filters (difficulty, model, persona, anchor type)
+  - Clicking opens the explanation modal with its saved messages loaded
+- When user generates an explanation (existing explain modal), automatically save
+  the full conversation (initial + follow-ups) via saveConversation().
+- When reopening: pass stored messages as initialMessages to useChat, using the
+  conversationId as the chat id. Show a "Continue" vs "New explanation" choice
+  when a saved conversation exists for the same anchor.
+
+--------------------------------------------------------------------------------
+C) FEATURE 3: EQUATION MAP
+
+Goal: provide an "Equation Map" view that shows all equations in the paper.
+
+Equation extraction — NO new API route needed:
+- The existing /api/parse-paper already extracts math content blocks with
+  type: "math", value (LaTeX), label (equation number), and isInline.
+- Create a client-side utility extractEquations(paper: Paper): Equation[] that:
+  - Collects all content blocks where type === "math" and isInline !== true
+    (display equations only; skip inline math)
+  - Uses the label field (already in ContentBlock schema) for equation numbers
+  - Generates stable equationId from section + block index (matching blockIds)
+  - Includes section heading and page numbers for context
+
+  Equation type:
+  {
+    equationId: string,          // matches the blockId
+    latex: string,               // the LaTeX value
+    label?: string,              // e.g. "(1)", from ContentBlock.label
+    sectionId: string,
+    sectionHeading: string,
+    pageNumbers: number[]
+  }
+
+- Skip the "mentions" (cross-reference) field for v1. Show equations grouped by
+  section instead. Cross-referencing can be added later as an optional LLM
+  enrichment step triggered by user action.
+
+UI requirements:
+- Add an "Equations" tab alongside the structured breakdown in the right panel.
+- Show list of equations with KaTeX-rendered preview.
+- Clicking an equation opens a detail view showing:
+  - The rendered equation with label
+  - Which section it appears in (with link to scroll there)
+  - Actions:
+    - "Explain" → calls /api/formula-explain (reuses existing route)
+    - "Deep Dive" → calls /api/deep-dive (reuses existing Wolfram Alpha route)
+- Save equation explanations using the conversations store with
+  anchor.type = "equation" and anchor.blockId = equationId.
+
+New component: components/equation-map.tsx
+New utility: included in lib/paper-utils.ts as extractEquations()
+
+--------------------------------------------------------------------------------
+D) FEATURE 4: EXPLAIN TO A SPECIFIC PERSON (PERSONA MODE)
+
+Add a persona/goal selector component: components/persona-goal-selector.tsx
+
+Persona dropdown options:
+  - "High-school student"
+  - "Undergraduate CS"
+  - "Software engineer"
+  - "Product manager"
+  - "PhD researcher (adjacent field)"
+  - "Clinician"
+  - "Investor"
+
+Goal dropdown options:
+  - "Understand the big idea"
+  - "Implement it"
+  - "Review/critique it"
+  - "Teach it"
+  - "Replicate the results"
+
+Optional tone: concise / friendly / technical.
+
+UX placement — inside modals/panels, NOT above the section list:
+- Place the selector inside the explanation modal as a collapsible "Customize"
+  section at the top, defaulting to collapsed with sensible defaults visible.
+- Place it inside the artifact generation panel similarly.
+- This avoids wasting vertical space on something only needed when generating.
+
+When generating any of these:
+  - section explanation
+  - equation explanation
+  - summary artifact
+  - slides artifact
+  - flashcards artifact
+…the request must include persona/goal/tone and the LLM prompt must condition
+outputs accordingly.
+
+Implementation — which routes to modify:
+- /api/explain: add optional persona, goal, tone to request body.
+  Extend buildExplainSystemPrompt() in lib/prompts.ts:
+    - Adapt explanation to persona; use analogies suitable for that audience.
+    - If persona is novice, avoid jargon or define all terms.
+    - If goal is "implement it", include pseudo-code / implementation steps.
+    - If goal is "review/critique", highlight limitations / confounds.
+- /api/formula-explain: add optional persona, goal, tone.
+- /api/deep-dive: add optional persona, goal, tone.
+- New artifact routes: /api/generate-summary, /api/generate-slides, /api/generate-flashcards
+  (see Section E).
+
+Do NOT modify /api/parse-paper — parsing is structural extraction, not
+explanation. Persona is irrelevant to PDF parsing.
+
+Persist persona/goal/tone used per conversation and per artifact in IndexedDB
+(already included in the conversations and artifacts schemas in Section A).
+
+--------------------------------------------------------------------------------
+E) FEATURE 5: ARTIFACT GENERATION (SUMMARY, SLIDES, FLASHCARDS)
+
+Add a new UI panel "Create Artifacts" in the right sidebar (or as a tab):
+- Generate Summary
+- Generate Slides
+- Generate Flashcards
+
+These stream results and save to IndexedDB on completion.
+
+Paper data payload optimization:
+Create a utility compressPaperForPrompt(paper: Paper, mode: string): string that:
+- Always includes: title, authors, abstract
+- Includes section headings as a table of contents
+- For "summary" mode: full text of intro, method, results, conclusion; truncates others
+- For "flashcards" mode: all sections but truncates long paragraphs (>500 chars)
+- For "slides" mode: all section headings + first paragraph of each
+
+Put this utility in lib/paper-utils.ts.
+
+1) Summary
+- Output: Markdown
+- Structure depends on persona/goal:
+  big idea, method, results, limitations, key terms, 5 bullet takeaways
+- New API route: POST /api/generate-summary
+  - Input: { paperText: string (from compressPaperForPrompt), persona?, goal?, tone?, difficulty?, model? }
+  - Output: streaming markdown via streamText() + toUIMessageStreamResponse()
+  - Use plain streamText() since output is markdown, not structured JSON.
+- Save as artifact with content: { type: "summary", markdown: string }
+
+2) Slides
+- Output: structured JSON
+- Params: default 6 slides; user can choose 5-12
+- JSON format:
+  {
+    title: string,
+    slides: Array<{
+      title: string,
+      bullets: string[],
+      speakerNotes?: string
+    }>
+  }
+- New API route: POST /api/generate-slides
+  - Use streamText() with Output.object() and a Zod schema (same pattern as
+    /api/parse-paper). This gives validated structured output with streaming
+    partial results.
+  - Input: { paperText, persona?, goal?, tone?, difficulty?, model?, slideCount? }
+- Save as artifact with content: { type: "slides", ... }
+- UI renders a slide preview list with:
+  - "Copy as Markdown" button
+  - "Download as JSON" button
+  (Do NOT add "Copy as Google Slides outline" — there is no standard import format.)
+
+3) Flashcards
+- Output: JSON
+  {
+    cards: Array<{
+      front: string,
+      back: string,
+      tags?: string[],
+      difficulty?: "easy"|"medium"|"hard"
+    }>
+  }
+- Params: default 12 cards; user can choose 5-30
+- New API route: POST /api/generate-flashcards
+  - Use streamText() with Output.object() and a Zod schema.
+  - Input: { paperText, persona?, goal?, tone?, difficulty?, model?, flashcardCount? }
+- Save as artifact with content: { type: "flashcards", ... }
+- UI shows cards with flip interaction + "Export as Anki TSV" button.
+
+All artifact routes must:
+- Use Zod schemas to validate outputs (slides/flashcards use Output.object();
+  summary uses plain streaming markdown).
+- Use the existing model selection logic (Claude/GPT) as in docs/llm-integration.md.
+- Include persona/goal/tone and difficulty in the prompt.
+- Use compressPaperForPrompt() to avoid huge token payloads.
+
+--------------------------------------------------------------------------------
+F) INTEGRATION DETAILS
+
+Loading saved conversations into useChat:
+- When opening a saved conversation, pass stored messages as initialMessages to
+  useChat. The ExplanationModal already recreates useChat on each open (via
+  changing the chat id prop).
+- Use conversationId as the chat id.
+- Pass saved messages array as initialMessages.
+- When a saved conversation exists for the same anchor, show a "Continue" vs
+  "New explanation" choice in the modal.
+- When the assistant response finishes streaming (onFinish callback in useChat),
+  call saveConversation() to persist the full message array.
+- For follow-up messages: update the conversation in IndexedDB after each
+  assistant response completes.
+
+Migration from old paper-cache DB:
+- In the idb upgrade callback (or on first db.open), check if the old
+  "paper-cache" DB exists (indexedDB.databases() or try opening).
+- Read all entries from the old DB.
+- For each: convert pdfBase64 to Blob (new Blob([base64ToArrayBuffer(pdfBase64)])),
+  recompute paperId as sha256 of the ArrayBuffer, map fields to new schema.
+- Write into the new "papers" store.
+- Delete the old "paper-cache" DB.
+
+Helper utilities — lib/paper-utils.ts:
+- extractEquations(paper: Paper): Equation[]
+  Collects display math blocks from all sections with context.
+- enrichPaperWithBlockIds(paper: Paper): Record<string, string[]>
+  Generates deterministic block IDs for anchoring.
+- compressPaperForPrompt(paper: Paper, mode: "summary"|"slides"|"flashcards"): string
+  Optimizes paper text for LLM token limits per artifact type.
+- getPaperStats(paper: Paper): { numSections, numParagraphs, numEquations }
+  Counts sections, text blocks, and math blocks.
+
+Keep type definitions in lib/paper-schema.ts (extend with new types as needed).
+Keep prompt templates in lib/prompts.ts.
+
+New UI components:
+- components/app-header.tsx          — shared navigation header
+- components/paper-workspace.tsx     — shared paper viewer (used by both / and /paper/[id])
+- components/library-list.tsx        — library page content
+- components/artifact-panel.tsx      — artifact generation + viewing
+- components/equation-map.tsx        — equation list and detail view
+- components/persona-goal-selector.tsx — persona/goal/tone dropdowns
+- components/conversation-list.tsx   — saved conversations sidebar panel
+
+Make sure build passes:
+- npm run lint
+- npm run build
+
+--------------------------------------------------------------------------------
+G) ACCEPTANCE CRITERIA (DEFINITION OF DONE)
+
+1) After analyzing a paper, it appears in /library and can be reopened without re-parsing.
+2) Explanation conversations are persisted and visible later; follow-up messages are preserved.
+3) Equation Map shows a list of display equations extracted from parsed data; each can be explained and deep-dived; those conversations persist.
+4) Persona/goal/tone selectors are available inside the explanation modal and artifact panel; values affect LLM outputs and are saved with each conversation/artifact.
+5) Summary, slide outline, and flashcards can be generated from any saved paper and are saved and viewable later.
+6) No server DB, no auth required; all persistence is local via IndexedDB (using idb).
+7) Code is type-safe and organized; no `any` in storage types.
+8) The old paper-cache DB is migrated and removed.
+9) Shared paper-workspace component prevents code duplication between / and /paper/[id].
+10) Navigation header allows moving between Home, Library, and saved papers.

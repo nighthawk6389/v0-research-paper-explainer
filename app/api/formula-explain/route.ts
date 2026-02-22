@@ -8,11 +8,17 @@ export async function POST(req: Request) {
     latex,
     paperTitle,
     sectionContext,
+    persona,
+    goal,
+    tone,
   }: {
     messages: UIMessage[]
     latex: string
     paperTitle: string
     sectionContext: string
+    persona?: string
+    goal?: string
+    tone?: string
   } = await req.json()
 
   console.log("[v0] Formula explain request", {
@@ -37,7 +43,7 @@ INSTRUCTIONS:
 - If there's a key insight or intuition, mention it in one sentence.
 - Do NOT use Wolfram Alpha or any tools. Just explain clearly.
 - Use LaTeX ($...$) for inline math and ($$...$$) for display math where needed.
-- Do NOT restate the full equation unless necessary.`
+- Do NOT restate the full equation unless necessary.${[persona, goal, tone].filter(Boolean).length ? `\n\nAUDIENCE/GOAL: ${persona ? `Explain for "${persona}". ` : ""}${goal ? `Goal: ${goal}. ` : ""}${tone ? `Tone: ${tone}.` : ""}` : ""}`
 
   const selectedModel = "anthropic/claude-haiku-4.5"
 

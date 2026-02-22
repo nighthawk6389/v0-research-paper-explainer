@@ -15,6 +15,9 @@ export async function POST(req: Request) {
     previousSectionsContext,
     difficultyLevel,
     model,
+    persona,
+    goal,
+    tone,
   }: {
     messages: UIMessage[]
     paperTitle: string
@@ -24,6 +27,9 @@ export async function POST(req: Request) {
     previousSectionsContext?: string
     difficultyLevel?: DifficultyLevel
     model?: string
+    persona?: string
+    goal?: string
+    tone?: string
   } = await req.json()
 
   console.log("[v0] Explain request started", {
@@ -43,7 +49,8 @@ export async function POST(req: Request) {
     sectionHeading,
     sectionContent,
     previousSectionsContext || "",
-    difficultyLevel || "advanced"
+    difficultyLevel || "advanced",
+    persona != null || goal != null || tone != null ? { persona, goal, tone } : undefined
   )
 
   const selectedModel = model || "anthropic/claude-haiku-4.5"

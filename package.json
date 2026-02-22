@@ -10,7 +10,8 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
-    "test:integration": "node tests/integration/parse-paper.mjs"
+    "test:integration": "node tests/integration/parse-paper.mjs",
+    "test:integration:artifacts": "node tests/integration/artifact-apis.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

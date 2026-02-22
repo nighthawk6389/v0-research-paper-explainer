@@ -99,9 +99,43 @@ YOUR APPROACH:
 4. Use LaTeX for any math in your explanation (wrap in $...$ for inline, $$...$$ for display).
 5. Adapt your language and depth to the specified difficulty level.
 
-FORMAT: Use markdown with clear structure. Use bullet points and numbered lists to break down complex ideas.`
+FORMAT: Use markdown with clear structure. Use bullet points and numbered lists to break down complex ideas.
+{personaInstructions}`
 
 export type DifficultyLevel = "basic" | "advanced" | "phd"
+
+export interface PersonaGoalOptions {
+  persona?: string
+  goal?: string
+  tone?: string
+}
+
+function buildPersonaInstructions(opts: PersonaGoalOptions): string {
+  const parts: string[] = []
+  if (opts.persona) {
+    parts.push(`AUDIENCE: Explain for "${opts.persona}". Use analogies and language suitable for this audience. Avoid jargon they would not know, or define every term.`)
+  }
+  if (opts.goal) {
+    if (opts.goal.toLowerCase().includes("implement")) {
+      parts.push("GOAL: The reader wants to implement this. Include concrete steps, pseudo-code, or implementation notes where relevant.")
+    } else if (opts.goal.toLowerCase().includes("review") || opts.goal.toLowerCase().includes("critique")) {
+      parts.push("GOAL: The reader wants to review or critique. Highlight limitations, confounds, and assumptions; mention alternative interpretations or weaknesses.")
+    } else if (opts.goal.toLowerCase().includes("teach")) {
+      parts.push("GOAL: The reader will teach this to others. Structure for clarity and emphasize key takeaways and common pitfalls.")
+    } else if (opts.goal.toLowerCase().includes("replicate")) {
+      parts.push("GOAL: The reader wants to replicate results. Emphasize methodological details, hyperparameters, and reproducibility.")
+    } else {
+      parts.push(`GOAL: "${opts.goal}". Adapt your explanation to support this goal.`)
+    }
+  }
+  if (opts.tone) {
+    const t = opts.tone.toLowerCase()
+    if (t === "concise") parts.push("TONE: Be concise and direct; avoid tangents.")
+    else if (t === "friendly") parts.push("TONE: Use a friendly, approachable tone.")
+    else if (t === "technical") parts.push("TONE: Use precise technical language.")
+  }
+  return parts.length ? "\n\n" + parts.join("\n") : ""
+}
 
 export function buildExplainSystemPrompt(
   paperTitle: string,
@@ -109,7 +143,8 @@ export function buildExplainSystemPrompt(
   sectionHeading: string,
   sectionContent: string,
   previousSectionsContext: string,
-  difficultyLevel: DifficultyLevel = "advanced"
+  difficultyLevel: DifficultyLevel = "advanced",
+  personaGoal?: PersonaGoalOptions
 ): string {
   const paperContext = paperAbstract 
     ? `Abstract: ${paperAbstract}`
@@ -119,6 +154,8 @@ export function buildExplainSystemPrompt(
     ? previousSectionsContext
     : "This is the first section (or no previous context available)."
 
+  const personaInstructions = buildPersonaInstructions(personaGoal ?? {})
+
   return EXPLAIN_SECTION_SYSTEM_PROMPT
     .replace("{paperTitle}", paperTitle)
     .replace("{paperContext}", paperContext)
@@ -127,4 +164,5 @@ export function buildExplainSystemPrompt(
     .replace("{sectionContent}", sectionContent)
     .replace("{difficultyLevel}", difficultyLevel.toUpperCase())
     .replace("{difficultyInstructions}", DIFFICULTY_INSTRUCTIONS[difficultyLevel])
+    .replace("{personaInstructions}", personaInstructions)
 }
